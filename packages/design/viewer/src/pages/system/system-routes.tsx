@@ -86,7 +86,7 @@ export function SystemRoutes() {
   const hasSystem = project ? project.system !== null : undefined
   // Wait for the project so a missing system never costs a 404.
   const { data: system, error, isLoading } = useSystem(hasSystem === true)
-  if (hasSystem === false || (error instanceof ApiError && error.status === 404)) return <NoSystem />
+  if (hasSystem === false || system === null || (error instanceof ApiError && error.status === 404)) return <NoSystem />
   if (error) return <Notice title="Could not load the design system" text={(error as Error).message} />
   if (isLoading || !system) return null
   return <Layout system={system} />

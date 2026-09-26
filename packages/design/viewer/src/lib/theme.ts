@@ -27,6 +27,8 @@ function apply() {
 
 media.addEventListener('change', apply)
 pref.subscribe(apply)
+// index.html applies it before first paint; an app that embeds the viewer gets it here.
+apply()
 
 export function setThemePref(value: ThemePref) {
   try {

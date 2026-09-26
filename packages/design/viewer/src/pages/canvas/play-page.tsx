@@ -8,13 +8,14 @@ import { Bar } from '../../components/topbar'
 import { useCanvas } from '../../lib/api'
 import { absoluteUrl, frameSrc, listenToFrame, reloadFrame, sendTheme } from '../../lib/frames'
 import { useTheme } from '../../lib/theme'
+import { useViewer } from '../../lib/viewer'
 import { IconButton } from '../../ui/button'
 import { Segmented } from '../../ui/choice'
 import { Icon } from '../../ui/icon'
 import { Kbd } from '../../ui/text'
 import { Tooltip } from '../../ui/tooltip'
 import { NotFound } from '../not-found'
-import { InspectToggle } from './canvas-page'
+import { InspectToggle } from './canvas-bar'
 import { isTyping } from './viewport'
 
 type Frame = ScreenItem | UrlItem
@@ -52,6 +53,7 @@ export function PlayPage({ canvasId, itemId }: { canvasId: string; itemId: strin
 
 function Player({ canvas, itemId }: { canvas: CanvasDoc; itemId: string }) {
   const [, navigate] = useLocation()
+  const { frameSandbox, slots } = useViewer()
   const pageParam =
     new URLSearchParams(window.location.search).get('page') ??
     (window.location.hash.split('?')[1] ? new URLSearchParams(window.location.hash.split('?')[1]).get('page') : null)
@@ -151,11 +153,13 @@ function Player({ canvas, itemId }: { canvas: CanvasDoc; itemId: string }) {
   const height = item.frame.height === 'auto' ? Math.max(area.h - 48, 400) : item.frame.height
   const scale = fit === 'fit' ? Math.min(1, (area.w - 48) / width, (area.h - 48) / height) : 1
   const fits = width <= area.w - 48 && height <= area.h - 48
-  const openUrl = item.kind === 'screen' ? absoluteUrl(frameSrc(item.url, frameTheme)) : item.url
+  // Sandboxed screens are served to frames only; a tab of their own would not load.
+  const openUrl = item.kind === 'url' ? item.url : frameSandbox ? null : absoluteUrl(frameSrc(item.url, frameTheme))
 
   return (
     <div className="flex h-dvh flex-col">
       <Bar>
+        {slots.barStart}
         <Tooltip
           content={
             <span className="flex items-center gap-1.5">
@@ -214,16 +218,19 @@ function Player({ canvas, itemId }: { canvas: CanvasDoc; itemId: string }) {
           ) : null}
           {item.kind === 'screen' ? <InspectToggle on={inspectOn} onChange={setInspect} /> : null}
           <IconButton icon="refresh" label="Reload" onClick={() => reloadFrame(frame.current)} />
-          <a
-            href={openUrl}
-            target="_blank"
-            rel="noreferrer"
-            title="Open in a new tab"
-            className="inline-flex h-ctrl w-ctrl items-center justify-center rounded-[6px] text-muted hover:bg-soft2 hover:text-ink2"
-          >
-            <Icon name="external" size={16} />
-          </a>
+          {openUrl ? (
+            <a
+              href={openUrl}
+              target="_blank"
+              rel="noreferrer"
+              title="Open in a new tab"
+              className="inline-flex h-ctrl w-ctrl items-center justify-center rounded-[6px] text-muted hover:bg-soft2 hover:text-ink2"
+            >
+              <Icon name="external" size={16} />
+            </a>
+          ) : null}
           <ThemeMenu />
+          {slots.barEnd}
         </div>
       </Bar>
       <div className="flex min-h-0 grow">
@@ -255,6 +262,7 @@ function Player({ canvas, itemId }: { canvas: CanvasDoc; itemId: string }) {
                 src={src}
                 title={item.title}
                 allow="clipboard-read; clipboard-write; fullscreen"
+                sandbox={frameSandbox}
                 className="block border-0"
                 style={{ width, height, transform: `scale(${scale})`, transformOrigin: '0 0', colorScheme: frameTheme }}
                 onLoad={() => item.kind === 'screen' && sendTheme(frame.current, frameTheme)}

@@ -1,13 +1,12 @@
 import * as Dialog from '@radix-ui/react-dialog'
-import type { CanvasDoc, SystemDoc } from '@shared/types'
-import { useQuery } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
 import { type ReactNode, useEffect, useState } from 'react'
 import { useLocation } from 'wouter'
-import { api, keys, useProject } from '../lib/api'
+import { useCanvas, useProject, useSystem } from '../lib/api'
 import { cn } from '../lib/cn'
 import { requestFocus } from '../lib/focus'
 import { setThemePref } from '../lib/theme'
+import { useViewer } from '../lib/viewer'
 import { Icon, type IconName } from '../ui/icon'
 import { Kbd } from '../ui/text'
 
@@ -38,16 +37,12 @@ function currentCanvas(location: string): string | null {
 
 function Palette({ onClose }: { onClose: () => void }) {
   const [location, navigate] = useLocation()
+  // A single canvas: its pages and screens, nothing of the rest of the project.
+  const scope = useViewer().scope
   const project = useProject().data
-  const canvasId = currentCanvas(location)
-  const canvas = useQuery({
-    queryKey: keys.canvas(canvasId ?? ''),
-    queryFn: () => api.canvas(canvasId!),
-    enabled: !!canvasId,
-  }).data as CanvasDoc | undefined
-  const system = useQuery({ queryKey: keys.system, queryFn: api.system, enabled: !!project?.system }).data as
-    | SystemDoc
-    | undefined
+  const canvasId = scope?.canvas ?? currentCanvas(location)
+  const canvas = useCanvas(canvasId ?? '', !!canvasId).data
+  const system = useSystem(!!project?.system).data
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
 
@@ -129,8 +124,9 @@ function Palette({ onClose }: { onClose: () => void }) {
         run: go(() => navigate(`/system/guidelines/${encodeURIComponent(guide.slug)}`)),
       })
   }
+  if (!scope)
+    commands.push({ id: 'home', group: 'actions', label: 'All canvases', icon: 'home', run: go(() => navigate('/')) })
   commands.push(
-    { id: 'home', group: 'actions', label: 'All canvases', icon: 'home', run: go(() => navigate('/')) },
     {
       id: 'light',
       group: 'actions',

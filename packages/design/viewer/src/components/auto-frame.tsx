@@ -2,6 +2,7 @@ import type { Theme } from '@shared/types'
 import { useEffect, useRef, useState } from 'react'
 import { cn } from '../lib/cn'
 import { frameSrc, listenToFrame, sendTheme } from '../lib/frames'
+import { useViewer } from '../lib/viewer'
 import { Icon } from '../ui/icon'
 
 /**
@@ -24,6 +25,7 @@ export function AutoFrame({
   className?: string
 }) {
   const ref = useRef<HTMLIFrameElement>(null)
+  const { frameSandbox } = useViewer()
   const [initial] = useState(() => ({ src, theme }))
   const url = frameSrc(src, initial.src === src ? initial.theme : theme)
   const [height, setHeight] = useState(minHeight)
@@ -62,6 +64,7 @@ export function AutoFrame({
         key={url}
         src={url}
         title={title}
+        sandbox={frameSandbox}
         className={cn('block w-full border-0 transition-opacity duration-150', ready ? 'opacity-100' : 'opacity-0')}
         style={{ height, colorScheme: theme }}
         onLoad={() => sendTheme(ref.current, theme)}
