@@ -3,6 +3,7 @@ import { DesignProject } from '../../core/project'
 import { DEV_URLS } from '../../core/sources'
 import { liveServer } from '../../server/state'
 import { bold, dim, green, print, red, yellow } from '../log'
+import { printCloudStatus } from './cloud-status'
 
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`
 
@@ -54,4 +55,5 @@ export async function runStatus(paths: DesignPaths) {
     `${label('Issues')}${errors ? red(summary) : warnings ? yellow(summary) : green(summary)}` +
       (issues.length ? dim(' — `design check` lists them') : ''),
   )
+  await printCloudStatus(paths, label)
 }

@@ -3,10 +3,12 @@ import { parseArgs } from 'node:util'
 import { designPaths, findProjectRoot, packageVersion } from '../core/paths'
 import { runBuild } from './commands/build'
 import { runCheck } from './commands/check'
+import { runLink, runLogin, runLogout } from './commands/cloud'
 import { runPreview, runStop } from './commands/preview'
 import { runInit, runNew, runSystemInit } from './commands/scaffold'
 import { runShot } from './commands/shot'
 import { runStatus } from './commands/status'
+import { runPull, runPush } from './commands/sync'
 import { bold, CliError, dim, print, red } from './log'
 
 const HELP = `${bold('foss-design')} ${dim(`v${packageVersion()}`)} — design canvases and design systems in .design
@@ -23,7 +25,9 @@ ${bold('Preview')}
                                              it) and print its URL; --open also opens a browser
           [--restart] [--foreground]
   stop                                       Stop the viewer
-  status                                     Viewer state and a project summary
+  status                                     Viewer state, a project summary and, with a cloud link, the
+                                             account, the linked project and each unit: in sync, local
+                                             changes, remote ahead, conflict or archived
 
 ${bold('Verify')}
   check [canvas…] [--render] [--json]        Validate canvas.json and the system; --render loads every
@@ -35,10 +39,26 @@ ${bold('Verify')}
 ${bold('Share')}
   build [canvas…] [--out <dir>] [--tar]      Static site of the canvases and the design system
 
+${bold('Cloud')}  ${dim('units: system (design.json + system/) and canvas/<id>; exit 2 = conflict')}
+  login                                      Sign in to foss-design Cloud; prints a link to open (the
+                                             code is in the link) and waits for approval
+  logout                                     Forget this machine's token for the cloud
+  link [<project>] [--new <name>]            No args: list your projects. Link .design to a cloud project
+                                             (linking to another project replaces the link)
+  push [canvas…] [--json]                    Build and upload what changed here (or the named units); a
+       [--resolved <unit>]                   system change pushes every active canvas with it. Stops if
+                                             the cloud is ahead; --resolved marks a merged conflict
+  pull [canvas…] [--json]                    Take cloud changes into .design; a unit changed on both sides
+       [--theirs <unit>]                     goes to .design/.cache/cloud/incoming/<unit> (exit 2);
+                                             --theirs takes the cloud version and drops local changes
+
 ${bold('Options')}
   --root <dir>   Project folder (default: the nearest folder with .design, or the current one)
   -h, --help     This help
   -v, --version  Version
+
+${bold('Environment')}
+  FOSS_DESIGN_CLOUD  Cloud to sign in and link to (default https://app.fossdesign.dev)
 `
 
 function projectPaths(rootOption: string | undefined, requireDesign = true) {
@@ -73,6 +93,9 @@ async function main(argv: string[]) {
       out: { type: 'string' },
       overview: { type: 'boolean' },
       tar: { type: 'boolean' },
+      new: { type: 'string' },
+      resolved: { type: 'string', multiple: true },
+      theirs: { type: 'string', multiple: true },
       help: { type: 'boolean', short: 'h' },
       version: { type: 'boolean', short: 'v' },
     },
@@ -127,6 +150,17 @@ async function main(argv: string[]) {
     }
     case 'build':
       return runBuild(projectPaths(values.root), rest, { out: values.out, tar: !!values.tar })
+    case 'login':
+      return runLogin()
+    case 'logout':
+      return runLogout()
+    case 'link':
+      if (rest.length > 1) throw new CliError('Usage: design link [<project>] [--new <name>]')
+      return runLink(projectPaths(values.root), rest[0], { newName: values.new })
+    case 'push':
+      return runPush(projectPaths(values.root), rest, { resolved: values.resolved ?? [], json: !!values.json })
+    case 'pull':
+      return runPull(projectPaths(values.root), rest, { theirs: values.theirs ?? [], json: !!values.json })
     default:
       throw new CliError(`Unknown command "${command}". Run \`design --help\`.`)
   }
