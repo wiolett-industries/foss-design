@@ -7,15 +7,19 @@ interface ToastItem {
   id: number
   title: string
   text?: string
+  tone: ToastTone
 }
+
+export type ToastTone = 'ok' | 'error'
 
 const toasts = new Store<ToastItem[]>([])
 let next = 1
 
-export function toast(title: string, text?: string) {
+/** A short confirmation; `error` shows a failure and stays a little longer to be read. */
+export function toast(title: string, text?: string, tone: ToastTone = 'ok') {
   const id = next++
-  toasts.set((list) => [...list.slice(-2), { id, title, text }])
-  setTimeout(() => toasts.set((list) => list.filter((item) => item.id !== id)), 2200)
+  toasts.set((list) => [...list.slice(-2), { id, title, text, tone }])
+  setTimeout(() => toasts.set((list) => list.filter((item) => item.id !== id)), tone === 'error' ? 4200 : 2200)
 }
 
 const hosts = new Store<number[]>([])
@@ -43,7 +47,11 @@ export function Toaster() {
             transition={{ type: 'spring', stiffness: 520, damping: 40 }}
             className="flex max-w-[420px] items-center gap-2.5 rounded-[8px] border border-rule bg-surface px-3 py-2 text-[13px] text-ink shadow-pop"
           >
-            <Icon name="check" size={15} className="text-ok-text" />
+            {item.tone === 'error' ? (
+              <Icon name="alert" size={15} className="text-danger-text" />
+            ) : (
+              <Icon name="check" size={15} className="text-ok-text" />
+            )}
             <span className="font-medium">{item.title}</span>
             {item.text ? <span className="truncate font-mono text-[12px] text-muted">{item.text}</span> : null}
           </motion.div>

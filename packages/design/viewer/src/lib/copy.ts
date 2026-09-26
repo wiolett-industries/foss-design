@@ -5,6 +5,6 @@ export async function copyText(text: string, label = 'Copied') {
     await navigator.clipboard.writeText(text)
     toast(label, text.length > 64 ? undefined : text)
   } catch {
-    toast('Could not copy', 'The browser blocked clipboard access')
+    toast('Could not copy', 'The browser blocked clipboard access', 'error')
   }
 }

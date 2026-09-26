@@ -104,17 +104,20 @@ export function AppTopBar() {
   const { slots } = useViewer()
   const [location] = useLocation()
   return (
-    <Bar>
-      {slots.barStart}
-      <div className="flex min-w-0 items-center gap-6">
-        <Wordmark name={project?.name} version={project?.version} />
-        <Tabs location={location} />
-      </div>
-      <div className="ml-auto flex items-center gap-2">
-        <SearchButton />
-        <ThemeMenu />
-        {slots.barEnd}
-      </div>
-    </Bar>
+    <>
+      <Bar>
+        {slots.barStart}
+        <div className="flex min-w-0 items-center gap-6">
+          <Wordmark name={project?.name} version={project?.version} />
+          <Tabs location={location} />
+        </div>
+        <div className="ml-auto flex items-center gap-2">
+          <SearchButton />
+          <ThemeMenu />
+          {slots.barEnd}
+        </div>
+      </Bar>
+      {slots.belowBar}
+    </>
   )
 }

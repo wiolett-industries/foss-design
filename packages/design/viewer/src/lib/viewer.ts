@@ -7,6 +7,8 @@ export interface ViewerSlots {
   barStart?: ReactNode
   /** At the end of every top bar. */
   barEnd?: ReactNode
+  /** Full width under every top bar, above the page: a notice strip. */
+  belowBar?: ReactNode
   /** Next to the project title on the home page. */
   homeActions?: ReactNode
   /** At the end of each canvas row on the home page. */

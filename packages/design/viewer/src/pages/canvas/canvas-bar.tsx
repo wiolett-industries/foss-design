@@ -44,69 +44,72 @@ export function CanvasBar({
   const [, navigate] = useLocation()
   const { slots, scope } = useViewer()
   return (
-    <Bar>
-      {slots.barStart}
-      {scope ? (
-        <Mark />
-      ) : (
-        <Tooltip content="All canvases">
-          <Link href="/" className="flex items-center" aria-label="All canvases">
-            <Mark />
-          </Link>
-        </Tooltip>
-      )}
-      <IconButton
-        icon="panel-left"
-        label={sidebar ? 'Hide sidebar (⌘\\)' : 'Show sidebar (⌘\\)'}
-        onClick={() => onSidebar(!sidebar)}
-      />
-      <div className="flex min-w-0 items-center gap-1.5 text-[14px]">
-        <span className="truncate font-semibold">{canvas.title}</span>
-        {page && canvas.pages.length > 1 ? (
-          <>
-            <Icon name="chevron-right" size={14} className="shrink-0 text-muted" />
-            <Menu
-              width={240}
-              trigger={
-                <button
-                  type="button"
-                  className="flex h-ctrl cursor-pointer items-center gap-1 rounded-[6px] border-0 bg-transparent px-2 text-[14px] text-ink2 hover:bg-soft2"
-                >
-                  <span className="truncate">{page.title}</span>
-                  <Icon name="chevron-down" size={14} className="text-muted" />
-                </button>
-              }
-            >
-              <MenuLabel>Pages</MenuLabel>
-              {canvas.pages.map((p) => (
-                <MenuItem key={p.id} active={p.id === page.id} onSelect={() => navigate(pageHref(canvas, p))}>
-                  <Icon name="file" size={15} className="text-muted" />
-                  {p.title}
-                </MenuItem>
-              ))}
-            </Menu>
-          </>
-        ) : null}
-      </div>
-      <div className="ml-auto flex items-center gap-2">
-        <Segmented
-          label="Screen theme"
-          value={theme}
-          onChange={onTheme}
-          items={[
-            { value: 'light', label: <Icon name="sun" size={15} />, title: 'Light screens' },
-            { value: 'dark', label: <Icon name="moon" size={15} />, title: 'Dark screens' },
-          ]}
+    <>
+      <Bar>
+        {slots.barStart}
+        {scope ? (
+          <Mark />
+        ) : (
+          <Tooltip content="All canvases">
+            <Link href="/" className="flex items-center" aria-label="All canvases">
+              <Mark />
+            </Link>
+          </Tooltip>
+        )}
+        <IconButton
+          icon="panel-left"
+          label={sidebar ? 'Hide sidebar (⌘\\)' : 'Show sidebar (⌘\\)'}
+          onClick={() => onSidebar(!sidebar)}
         />
-        <InspectToggle on={inspect} onChange={onInspect} />
-        <Button kind="secondary" icon="play" onClick={onPlay} disabled={!canPlay}>
-          Play
-        </Button>
-        <SearchButton width={200} label="Search" />
-        <ThemeMenu />
-        {slots.barEnd}
-      </div>
-    </Bar>
+        <div className="flex min-w-0 items-center gap-1.5 text-[14px]">
+          <span className="truncate font-semibold">{canvas.title}</span>
+          {page && canvas.pages.length > 1 ? (
+            <>
+              <Icon name="chevron-right" size={14} className="shrink-0 text-muted" />
+              <Menu
+                width={240}
+                trigger={
+                  <button
+                    type="button"
+                    className="flex h-ctrl cursor-pointer items-center gap-1 rounded-[6px] border-0 bg-transparent px-2 text-[14px] text-ink2 hover:bg-soft2"
+                  >
+                    <span className="truncate">{page.title}</span>
+                    <Icon name="chevron-down" size={14} className="text-muted" />
+                  </button>
+                }
+              >
+                <MenuLabel>Pages</MenuLabel>
+                {canvas.pages.map((p) => (
+                  <MenuItem key={p.id} active={p.id === page.id} onSelect={() => navigate(pageHref(canvas, p))}>
+                    <Icon name="file" size={15} className="text-muted" />
+                    {p.title}
+                  </MenuItem>
+                ))}
+              </Menu>
+            </>
+          ) : null}
+        </div>
+        <div className="ml-auto flex items-center gap-2">
+          <Segmented
+            label="Screen theme"
+            value={theme}
+            onChange={onTheme}
+            items={[
+              { value: 'light', label: <Icon name="sun" size={15} />, title: 'Light screens' },
+              { value: 'dark', label: <Icon name="moon" size={15} />, title: 'Dark screens' },
+            ]}
+          />
+          <InspectToggle on={inspect} onChange={onInspect} />
+          <Button kind="secondary" icon="play" onClick={onPlay} disabled={!canPlay}>
+            Play
+          </Button>
+          <SearchButton width={200} label="Search" />
+          <ThemeMenu />
+          {slots.barEnd}
+        </div>
+      </Bar>
+      {slots.belowBar}
+    </>
   )
 }
 

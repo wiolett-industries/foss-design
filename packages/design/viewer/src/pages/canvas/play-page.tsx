@@ -233,6 +233,7 @@ function Player({ canvas, itemId }: { canvas: CanvasDoc; itemId: string }) {
           {slots.barEnd}
         </div>
       </Bar>
+      {slots.belowBar}
       <div className="flex min-h-0 grow">
         <div
           ref={stage}

@@ -70,5 +70,5 @@ export {
 } from './ui/panel'
 export { Kbd, Mono, Muted, Two } from './ui/text'
 export { TextArea, type TextAreaProps, TextField, type TextFieldProps } from './ui/text-field'
-export { Toaster, toast } from './ui/toast'
+export { Toaster, type ToastTone, toast } from './ui/toast'
 export { Tooltip, TooltipProvider } from './ui/tooltip'
