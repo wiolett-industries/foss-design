@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
-import { buildSite, copyViewer } from '../../build/static'
+import { buildSite } from '../../build/static'
 import { type DesignPaths, PKG } from '../../core/paths'
 import { bold, CliError, dim, print, warn } from '../log'
 
@@ -28,12 +28,12 @@ export async function runBuild(paths: DesignPaths, canvases: string[], options: 
   print(dim(`Building ${canvases.length ? canvases.join(', ') : 'every canvas'} and the design system…`))
   let result: Awaited<ReturnType<typeof buildSite>>
   try {
-    result = await buildSite(paths, canvases, out)
+    result = await buildSite(paths, out, { canvases: canvases.length ? canvases : undefined })
   } catch (error) {
     throw new CliError((error as Error).message)
   }
-  const { absoluteAssets } = copyViewer(PKG.viewer, out)
-  if (absoluteAssets) warn('the viewer references assets by absolute path; the site only works at the root of a host')
+  if (result.absoluteAssets)
+    warn('the viewer references assets by absolute path; the site only works at the root of a host')
 
   print(`${bold('Site')}    ${out}`)
   print(

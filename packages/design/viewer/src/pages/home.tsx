@@ -1,7 +1,9 @@
 import type { CanvasSummary, ProjectInfo } from '@shared/types'
+import type { ReactNode } from 'react'
 import { IssuesPanel } from '../components/issues'
-import { STATIC, useProject } from '../lib/api'
+import { useProject } from '../lib/api'
 import { plural, relativeTime } from '../lib/format'
+import { useViewer } from '../lib/viewer'
 import { Badge, Count } from '../ui/badge'
 import { ButtonLink } from '../ui/button'
 import { Icon } from '../ui/icon'
@@ -21,7 +23,22 @@ function Cover({ canvas }: { canvas: CanvasSummary }) {
   )
 }
 
+/** A canvas row with the embedding app's actions after it, outside the link. */
+function WithActions({ actions, children }: { actions: ReactNode; children: ReactNode }) {
+  if (!actions) return children
+  return (
+    <div
+      className="grid items-center border-t border-rule transition-colors hover:bg-soft"
+      style={{ gridTemplateColumns: 'minmax(0,1fr) auto' }}
+    >
+      {children}
+      <div className="flex items-center gap-2 pr-4">{actions}</div>
+    </div>
+  )
+}
+
 function CanvasList({ project }: { project: ProjectInfo }) {
+  const rowActions = useViewer().slots.canvasRowActions
   if (!project.canvases.length) {
     return (
       <Panel>
@@ -40,24 +57,31 @@ function CanvasList({ project }: { project: ProjectInfo }) {
   return (
     <Panel>
       <PanelHead title="Canvases" count={project.canvases.length} />
-      {project.canvases.map((canvas) => (
-        <RowLink
-          key={canvas.id}
-          to={`/c/${encodeURIComponent(canvas.id)}`}
-          cols="86px minmax(0,1fr) auto auto"
-          align="llrr"
-          pad="10px 16px"
-          minH={74}
-        >
-          <Cover canvas={canvas} />
-          <Two top={canvas.title} bottom={<span className="truncate">{canvas.description ?? canvas.id}</span>} />
-          <span className="flex items-center gap-2 text-[12.5px] whitespace-nowrap text-muted">
-            {canvas.issues ? <Badge tone="danger">{plural(canvas.issues, 'problem')}</Badge> : null}
-            {plural(canvas.screens, 'screen')} · {plural(canvas.pages, 'page')}
-          </span>
-          <span className="w-[92px] text-[12.5px] whitespace-nowrap text-muted">{relativeTime(canvas.updatedAt)}</span>
-        </RowLink>
-      ))}
+      {project.canvases.map((canvas) => {
+        const actions = rowActions?.(canvas.id)
+        return (
+          <WithActions key={canvas.id} actions={actions}>
+            <RowLink
+              to={`/c/${encodeURIComponent(canvas.id)}`}
+              cols="86px minmax(0,1fr) auto auto"
+              align="llrr"
+              pad="10px 16px"
+              minH={74}
+              first={!!actions}
+            >
+              <Cover canvas={canvas} />
+              <Two top={canvas.title} bottom={<span className="truncate">{canvas.description ?? canvas.id}</span>} />
+              <span className="flex items-center gap-2 text-[12.5px] whitespace-nowrap text-muted">
+                {canvas.issues ? <Badge tone="danger">{plural(canvas.issues, 'problem')}</Badge> : null}
+                {plural(canvas.screens, 'screen')} · {plural(canvas.pages, 'page')}
+              </span>
+              <span className="w-[92px] text-[12.5px] whitespace-nowrap text-muted">
+                {relativeTime(canvas.updatedAt)}
+              </span>
+            </RowLink>
+          </WithActions>
+        )
+      })}
     </Panel>
   )
 }
@@ -103,14 +127,16 @@ function SystemCard({ project }: { project: ProjectInfo }) {
 
 export function HomePage() {
   const { data: project, error, isLoading } = useProject()
+  const { slots } = useViewer()
   if (error) return <Notice title="Could not load the project" text={(error as Error).message} />
   if (isLoading || !project) return null
   return (
     <Content>
       <PageHead
         title={project.name}
+        right={slots.homeActions}
         sub={
-          STATIC ? (
+          project.static ? (
             `Snapshot built with foss-design ${project.version}`
           ) : (
             <>
@@ -127,6 +153,7 @@ export function HomePage() {
         <CanvasList project={project} />
         <SystemCard project={project} />
       </div>
+      {slots.homeAfter}
     </Content>
   )
 }

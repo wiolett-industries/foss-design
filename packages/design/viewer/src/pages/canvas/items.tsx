@@ -4,6 +4,7 @@ import { Markdown } from '../../components/markdown'
 import { cn } from '../../lib/cn'
 import { claimWheel, frameSrc, listenToFrame, sendTheme } from '../../lib/frames'
 import { useStore } from '../../lib/store'
+import { useViewer } from '../../lib/viewer'
 import { Icon } from '../../ui/icon'
 import type { Placed } from './layout'
 import { setFrame, setFrameEl, setSize, type ViewStore } from './view-state'
@@ -55,6 +56,7 @@ export const FrameItem = memo(function FrameItem({
 }) {
   const { item, x, y, w, h } = placed
   const ref = useRef<HTMLIFrameElement | null>(null)
+  const { frameSandbox } = useViewer()
   const setRef = useCallback(
     (el: HTMLIFrameElement | null) => {
       ref.current = el
@@ -150,6 +152,7 @@ export const FrameItem = memo(function FrameItem({
             src={src}
             title={item.title}
             allow="clipboard-read; clipboard-write; fullscreen"
+            sandbox={frameSandbox}
             className={cn(
               'absolute top-0 left-0 block border-0 transition-opacity duration-200',
               ready ? 'opacity-100' : 'opacity-0',

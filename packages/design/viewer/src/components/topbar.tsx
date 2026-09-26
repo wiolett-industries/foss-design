@@ -3,6 +3,7 @@ import { type ReactNode, useLayoutEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'wouter'
 import { useProject } from '../lib/api'
 import { cn } from '../lib/cn'
+import { useViewer } from '../lib/viewer'
 import { SearchButton } from './search-button'
 import { ThemeMenu } from './theme-menu'
 import { Wordmark } from './wordmark'
@@ -100,9 +101,11 @@ function Tabs({ location }: { location: string }) {
 /** The app's top bar: project, sections, search and appearance. */
 export function AppTopBar() {
   const project = useProject().data
+  const { slots } = useViewer()
   const [location] = useLocation()
   return (
     <Bar>
+      {slots.barStart}
       <div className="flex min-w-0 items-center gap-6">
         <Wordmark name={project?.name} version={project?.version} />
         <Tabs location={location} />
@@ -110,6 +113,7 @@ export function AppTopBar() {
       <div className="ml-auto flex items-center gap-2">
         <SearchButton />
         <ThemeMenu />
+        {slots.barEnd}
       </div>
     </Bar>
   )

@@ -76,6 +76,14 @@ The viewer is local. When the user wants a link for someone else:
 1. `$D build <canvas> --tar` builds a static site (viewer, screens, system) and packs it into an archive with `index.html` at the root; the command prints the paths.
 2. If the Gateway `publishing-html-pages` skill is installed and connected, publish that archive through Gateway Pages and share the verified link. Otherwise hand over the folder or archive for any static host.
 
+When the user wants the canvases in foss-design Cloud (to share with teammates, pull them on another machine, or publish a link), use the cloud commands, and only when asked:
+
+1. `$D status` shows whether this machine is signed in and whether `.design` is linked.
+2. Not signed in: run `$D login`. It prints a link with the code in it and waits. Give the user that link exactly as printed and wait for the command to finish; never open or approve it yourself.
+3. Not linked: `$D link` lists the user's projects; `$D link <project-id>` links one, `$D link --new "<name>"` creates one. Ask which when it is not obvious.
+4. `$D push` uploads what changed. If it stops with "pull first" (exit 2), run `$D pull`. A unit changed on both sides is left untouched and the cloud version is written to `.design/.cache/cloud/incoming/<unit>/`: merge it into the local files, keeping both sides' intent, then `$D push --resolved <unit>`. Use `$D pull --theirs <unit>` only when the user says to drop the local changes.
+5. Sharing, roles and public links are managed in the web app at the project page; hand the user the link to it.
+
 Never publish through Claude Artifacts, and never paste screen source into chat as a substitute for the canvas.
 
 ## Pitfalls

@@ -11,7 +11,8 @@ This repository holds foss-design: the `foss-design` npm package (CLI, preview s
 | Runtime | `packages/design/src/runtime/` | Code injected into every frame: theme, size reporting, `go()`, errors, snapshots, the inspector. Frames may sit on another origin than the viewer (see `viewer/src/lib/frames.ts`), so the viewer talks to them only through postMessage. Built to `dist/runtime`. |
 | CLI | `packages/design/src/cli/` | Commands; `index.ts` holds the help text, which is the CLI contract. |
 | Capture | `packages/design/src/capture/` | Chrome launching and frame loading for `check --render` and `shot`. |
-| Viewer | `packages/design/viewer/` | The React app served at `/`, built to `dist/viewer`. |
+| Viewer | `packages/design/viewer/` | The React app served at `/`, built to `dist/viewer`; also the `foss-design/viewer` library (`src/library.ts`, `ViewerSource`) built to `dist/viewer-lib`. |
+| Cloud client | `packages/design/src/cloud/` | Device login, credentials, units and manifests, push and pull against foss-design Cloud. |
 | Skills | `skills/<name>/` | `SKILL.md`, `references/`, `agents/openai.yaml`. |
 | Plugins | `.claude-plugin/`, `.codex-plugin/`, `.agents/plugins/` | Plugin and marketplace metadata. |
 | Example | `examples/` | A project with a `.design` folder, for trying changes end to end. |

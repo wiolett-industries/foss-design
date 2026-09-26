@@ -1,5 +1,5 @@
 import type { RuntimeMessage, Theme, ViewerMessage } from '@shared/types'
-import { STATIC } from './api'
+import { STATIC_SITE } from './source'
 
 type Handler = (message: RuntimeMessage) => void
 
@@ -71,7 +71,7 @@ export function reloadFrame(frame: HTMLIFrameElement | null) {
  * and static builds, keep frames on the viewer's origin.
  */
 export const FRAME_ORIGIN = (() => {
-  if (STATIC) return ''
+  if (STATIC_SITE) return ''
   const { protocol, hostname, port } = window.location
   const twin = hostname === 'localhost' ? '127.0.0.1' : hostname === '127.0.0.1' ? 'localhost' : null
   return twin ? `${protocol}//${twin}${port ? `:${port}` : ''}` : ''

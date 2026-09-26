@@ -1,102 +1,63 @@
-import type { CanvasDoc, DesignEvent, ProjectInfo, SystemDoc } from '@shared/types'
+import type { DesignEvent } from '@shared/types'
 import { QueryClient, useQuery } from '@tanstack/react-query'
+import { resolveCanvas, resolveSystem } from './source'
+import { useViewer, type ViewerKeys } from './viewer'
 
-declare global {
-  interface Window {
-    __DESIGN_STATIC__?: boolean
-    __DESIGN_CANVAS_READY__?: boolean
-  }
+export { ApiError } from './source'
+
+/** A live source refetches on every change it announces; the others load once. */
+export function createQueryClient(live: boolean) {
+  return new QueryClient({
+    defaultOptions: {
+      queries: { staleTime: live ? 0 : Number.POSITIVE_INFINITY, retry: 1, refetchOnWindowFocus: false },
+    },
+  })
 }
 
-/** A static build: JSON files instead of the API, hash routing, no live updates. */
-export const STATIC = window.__DESIGN_STATIC__ === true
-
-export class ApiError extends Error {
-  constructor(
-    readonly status: number,
-    message: string,
-  ) {
-    super(message)
-  }
-}
-
-async function get<T>(url: string): Promise<T> {
-  const response = await fetch(url, { cache: STATIC ? 'default' : 'no-store' })
-  if (!response.ok) {
-    let message = `${response.status} ${response.statusText}`
-    try {
-      const body = (await response.json()) as { error?: string }
-      if (body.error) message = body.error
-    } catch {}
-    throw new ApiError(response.status, message)
-  }
-  return (await response.json()) as T
-}
-
-let staticSources: Promise<Record<string, string>> | null = null
-
-export const api = {
-  project: () =>
-    get<ProjectInfo>(STATIC ? 'api/project.json' : '/api/project').then((info) => {
-      logVersion(info.version)
-      return info
-    }),
-  canvas: (id: string) =>
-    get<CanvasDoc>(STATIC ? `api/canvas/${encodeURIComponent(id)}.json` : `/api/canvas/${encodeURIComponent(id)}`),
-  system: () => get<SystemDoc>(STATIC ? 'api/system.json' : '/api/system'),
-  async source(path: string): Promise<string> {
-    if (STATIC) {
-      staticSources ??= get<Record<string, string>>('api/sources.json').catch(() => ({}))
-      const text = (await staticSources)[path]
-      if (text === undefined) throw new ApiError(404, `${path} is not in this build`)
-      return text
-    }
-    const response = await fetch(`/api/source?path=${encodeURIComponent(path)}`, { cache: 'no-store' })
-    if (!response.ok) throw new ApiError(response.status, `Could not read ${path}`)
-    return response.text()
-  },
-}
-
-export const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: { staleTime: STATIC ? Number.POSITIVE_INFINITY : 0, retry: 1, refetchOnWindowFocus: false },
-  },
-})
-
-export const keys = {
-  project: ['project'] as const,
-  canvas: (id: string) => ['canvas', id] as const,
-  system: ['system'] as const,
-  source: (path: string) => ['source', path] as const,
-}
-
-let loggedVersion = ''
-/** Once per load, so "which version is this?" has an answer in the console. */
-function logVersion(version: string) {
-  if (loggedVersion === version) return
-  loggedVersion = version
-  console.info(`foss-design ${version}${STATIC ? ' (static build)' : ''}`)
-}
-
+/** Nothing in single-canvas mode needs the project. */
 export function useProject() {
-  return useQuery({ queryKey: keys.project, queryFn: api.project })
+  const { source, keys, scope } = useViewer()
+  return useQuery({ queryKey: keys.project, queryFn: () => source.project(), enabled: !scope })
 }
 
-export function useCanvas(id: string) {
-  return useQuery({ queryKey: keys.canvas(id), queryFn: () => api.canvas(id), placeholderData: (prev) => prev })
+export function useCanvas(id: string, enabled = true) {
+  const { source, keys } = useViewer()
+  return useQuery({
+    queryKey: keys.canvas(id),
+    queryFn: async () => {
+      const { doc, base } = await source.canvas(id)
+      return resolveCanvas(doc, base)
+    },
+    placeholderData: (prev) => prev,
+    enabled,
+  })
 }
 
+/** Null when the project has no design system. */
 export function useSystem(enabled = true) {
-  return useQuery({ queryKey: keys.system, queryFn: api.system, enabled })
+  const { source, keys } = useViewer()
+  return useQuery({
+    queryKey: keys.system,
+    queryFn: async () => {
+      const system = await source.system()
+      return system ? resolveSystem(system.doc, system.base) : null
+    },
+    enabled,
+  })
 }
 
-export function useSource(path: string | null) {
-  return useQuery({ queryKey: keys.source(path ?? ''), queryFn: () => api.source(path!), enabled: !!path })
+/** A file of the design system. */
+export function useSource(path: string | null, unit = 'system') {
+  const { source, keys } = useViewer()
+  return useQuery({
+    queryKey: keys.source(unit, path ?? ''),
+    queryFn: () => source.source(path!, unit),
+    enabled: !!path,
+  })
 }
 
-/** Keep queries fresh from the server's event stream. */
-export function connectEvents() {
-  if (STATIC) return () => {}
+/** Keep queries fresh from the preview server's event stream. */
+export function connectEvents(queryClient: QueryClient, keys: ViewerKeys) {
   let source: EventSource | null = null
   let dropped = false
   const open = () => {
@@ -104,7 +65,7 @@ export function connectEvents() {
     source.onopen = () => {
       if (dropped) {
         dropped = false
-        void queryClient.invalidateQueries()
+        void queryClient.invalidateQueries({ queryKey: keys.all })
       }
     }
     source.onerror = () => {
@@ -120,7 +81,7 @@ export function connectEvents() {
       if (event.type === 'project') void queryClient.invalidateQueries({ queryKey: keys.project })
       else if (event.type === 'system') {
         void queryClient.invalidateQueries({ queryKey: keys.system })
-        void queryClient.invalidateQueries({ queryKey: ['source'] })
+        void queryClient.invalidateQueries({ queryKey: keys.sources })
       } else if (event.type === 'canvas' || event.type === 'snapshot') {
         const id = event.type === 'canvas' ? event.id : event.canvas
         void queryClient.invalidateQueries({ queryKey: keys.canvas(id) })

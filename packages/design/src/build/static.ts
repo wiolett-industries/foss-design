@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { build } from 'vite'
 import type { ResolvedCanvas } from '../core/canvas'
-import type { DesignPaths } from '../core/paths'
+import { type DesignPaths, PKG } from '../core/paths'
 import { ensureThumb } from '../core/png'
 import { DesignProject } from '../core/project'
 import { type ScreenSource, type SnapshotLookup, STATIC_URLS } from '../core/sources'
@@ -20,6 +20,17 @@ export interface SiteResult {
   frames: number
   /** Errors in the built canvases and the system; missing screens are left out of the site. */
   errors: number
+  /** The copied viewer references assets by absolute path, so the site only works at the root of a host. */
+  absoluteAssets: boolean
+}
+
+export interface BuildOptions {
+  /** Canvas ids to build; every canvas when left out, none for an empty list. */
+  canvases?: string[]
+  /** Build the design system specimens and write `api/system.json` and `api/sources.json`. Default true. */
+  includeSystem?: boolean
+  /** Copy the static viewer (`index.html` and its assets) into the site. Default true. */
+  includeViewer?: boolean
 }
 
 const THEMES: Theme[] = ['light', 'dark']
@@ -114,19 +125,23 @@ function writeJson(file: string, value: unknown) {
 }
 
 /**
- * Build every frame of the chosen canvases and of the design system into
- * `out`, with the JSON the viewer reads in static mode. The viewer itself is
- * copied in by the caller.
+ * Build every frame of the chosen canvases and (unless left out) of the design
+ * system into `out`, with the JSON the viewer reads in static mode, and copy
+ * the static viewer in. A cloud unit build leaves the viewer out and builds
+ * either the system alone or one canvas without the system.
  */
-export async function buildSite(paths: DesignPaths, only: string[], out: string): Promise<SiteResult> {
+export async function buildSite(paths: DesignPaths, out: string, options: BuildOptions = {}): Promise<SiteResult> {
   const snapshots = staticSnapshots(paths)
   const project = new DesignProject(paths, STATIC_URLS, snapshots.lookup)
   const known = project.canvasIds()
-  const unknown = only.filter((id) => !known.includes(id))
+  const only = options.canvases
+  const unknown = (only ?? []).filter((id) => !known.includes(id))
   if (unknown.length) throw new Error(`No canvas ${unknown.map((id) => `"${id}"`).join(', ')}`)
-  const canvasIds = only.length ? only : known
+  const canvasIds = only ?? known
   const canvases = canvasIds.map((id) => project.canvas(id)).filter((c): c is ResolvedCanvas => c !== null)
-  const system = project.system()
+  // Canvas frames use the system's fonts and stylesheet either way; `system` is what the site documents.
+  const loadedSystem = project.system()
+  const system = options.includeSystem === false ? null : loadedSystem
 
   const entries = new Entries(project)
   entries.sync()
@@ -135,7 +150,7 @@ export async function buildSite(paths: DesignPaths, only: string[], out: string)
   // Stage one HTML page per frame at the path it will have in the site.
   const staging = path.join(paths.cache, 'build', 'src')
   fs.rmSync(staging, { recursive: true, force: true })
-  const fonts = system?.doc.fonts ?? []
+  const fonts = loadedSystem?.doc.fonts ?? []
   const sources: ScreenSource[] = [...(system?.specimens ?? []), ...canvases.flatMap((canvas) => canvas.screens)]
   const inputs: string[] = []
   const htmlScreens: { source: ScreenSource; dir: string }[] = []
@@ -219,14 +234,18 @@ export async function buildSite(paths: DesignPaths, only: string[], out: string)
     fs.copyFileSync(from, to)
   }
 
+  // Loading the project info resolves every canvas; only the built ones keep their snapshots.
+  const info = project.info(true)
+  const snapshotDirs = canvasIds.map((id) => `_snap/${id}/`)
   for (const [from, rel] of snapshots.copies) {
+    if (!snapshotDirs.some((dir) => rel.startsWith(dir))) continue
     const to = path.join(out, rel)
     fs.mkdirSync(path.dirname(to), { recursive: true })
     fs.copyFileSync(from, to)
   }
 
   // What the viewer fetches in static mode.
-  const info = project.info(true)
+  if (!system) info.system = null
   info.canvases = info.canvases.filter((canvas) => canvasIds.includes(canvas.id))
   writeJson(path.join(out, 'api', 'project.json'), info)
   for (const canvas of canvases) writeJson(path.join(out, 'api', 'canvas', `${canvas.doc.id}.json`), canvas.doc)
@@ -244,11 +263,12 @@ export async function buildSite(paths: DesignPaths, only: string[], out: string)
 
   fs.rmSync(staging, { recursive: true, force: true })
   const errors = [
-    ...(only.length ? [] : project.config().issues),
+    ...(only ? [] : project.config().issues),
     ...(system?.doc.issues ?? []),
     ...canvases.flatMap((canvas) => canvas.doc.issues),
   ].filter((issue) => issue.severity === 'error').length
-  return { out, canvases: canvasIds, frames: inputs.length, errors }
+  const { absoluteAssets } = options.includeViewer === false ? { absoluteAssets: false } : copyViewer(PKG.viewer, out)
+  return { out, canvases: canvasIds, frames: inputs.length, errors, absoluteAssets }
 }
 
 /** Copy the built viewer into the site and switch it to static mode. */

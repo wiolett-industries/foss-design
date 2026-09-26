@@ -1,6 +1,6 @@
 {
   "name": "foss-design",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Design canvases and design systems for coding agents: live, animated, clickable screens on an infinite canvas, served locally from a .design folder.",
   "type": "module",
   "license": "MIT",
@@ -36,15 +36,21 @@
   ],
   "exports": {
     "./runtime": "./dist/runtime/index.js",
+    "./viewer": {
+      "types": "./dist/viewer-lib/index.d.ts",
+      "import": "./dist/viewer-lib/index.js"
+    },
+    "./viewer/styles.css": "./dist/viewer-lib/styles.css",
     "./package.json": "./package.json"
   },
   "engines": {
     "node": ">=20.19"
   },
   "scripts": {
-    "build": "pnpm build:viewer && pnpm build:node",
+    "build": "pnpm build:viewer && pnpm build:viewer-lib && pnpm build:node",
     "build:node": "tsup",
     "build:viewer": "vite build --config viewer/vite.config.ts",
+    "build:viewer-lib": "vite build --config viewer/vite.lib.config.ts && tsc -p viewer/tsconfig.lib.json && node viewer/lib-types.mjs",
     "dev": "tsup --watch",
     "dev:viewer": "vite --config viewer/vite.config.ts",
     "typecheck": "tsc -p tsconfig.json && tsc -p viewer/tsconfig.json",
@@ -66,6 +72,18 @@
     "tailwindcss": "^4.3.3",
     "vite": "^8.3.1",
     "zod": "^4.6.5"
+  },
+  "peerDependencies": {
+    "@tanstack/react-query": "^5.104.0",
+    "wouter": "^3.11.0"
+  },
+  "peerDependenciesMeta": {
+    "@tanstack/react-query": {
+      "optional": true
+    },
+    "wouter": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@fontsource/ibm-plex-mono": "^5.3.0",

@@ -68,5 +68,6 @@ When there is no product UI to mirror:
 - `system.json` is strict: unknown keys are errors. `name` is required.
 - Specimen ids come from file names; renaming a specimen changes its URL.
 - Screens only see component changes after save; nothing needs rebuilding. The viewer's `/system` pages update live.
+- In a project linked to foss-design Cloud, pushing a design system change rebuilds and pushes every active canvas with it; `$D push` handles that, but the local copy must be up to date first (`$D pull`).
 
 Reference: [System format](references/system-format.md).
