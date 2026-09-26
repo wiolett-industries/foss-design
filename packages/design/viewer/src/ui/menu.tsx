@@ -2,8 +2,11 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import type { ReactNode } from 'react'
 import { cn } from '../lib/cn'
 
-export const menuSurface =
-  'z-50 overflow-hidden rounded-[8px] border border-rule bg-surface py-1 shadow-pop outline-none data-[state=open]:animate-[q-pop_120ms_ease-out] data-[state=closed]:animate-[q-pop-out_100ms_ease-in_forwards]'
+/** Menus and dialogs float on the same surface. */
+export const floatingSurface =
+  'z-50 overflow-hidden rounded-[8px] border border-rule bg-surface shadow-pop outline-none'
+
+export const menuSurface = `${floatingSurface} py-1 data-[state=open]:animate-[q-pop_120ms_ease-out] data-[state=closed]:animate-[q-pop-out_100ms_ease-in_forwards]`
 
 export function Menu({
   trigger,
@@ -81,5 +84,3 @@ export function MenuSeparator() {
 export function MenuLabel({ children }: { children: ReactNode }) {
   return <DropdownMenu.Label className="px-3 pt-1.5 pb-1 text-[12px] text-muted">{children}</DropdownMenu.Label>
 }
-
-export { DropdownMenu }

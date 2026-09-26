@@ -5,6 +5,7 @@ import { CodeView } from '../../components/code-view'
 import { useSource } from '../../lib/api'
 import { copyText } from '../../lib/copy'
 import { absoluteUrl, frameSrc } from '../../lib/frames'
+import { useViewer } from '../../lib/viewer'
 import { Badge, type Tone } from '../../ui/badge'
 import { ButtonAnchor, IconButton } from '../../ui/button'
 import { Segmented } from '../../ui/choice'
@@ -130,6 +131,8 @@ export function ComponentPage({ system, id }: { system: SystemDoc; id: string })
   const [tab, setTab] = useState<'preview' | 'code'>('preview')
   const [theme, setTheme] = useLocalTheme()
   const [width, setWidth] = useState<Width>('fill')
+  // Sandboxed specimens are served to frames only; a tab of their own would not load.
+  const openable = !useViewer().frameSandbox
   if (!component)
     return <NotFound title="No such component" text={`There is no specimen "${id}" in .design/system/specimens.`} />
   const status = component.status?.toLowerCase()
@@ -168,14 +171,16 @@ export function ComponentPage({ system, id }: { system: SystemDoc; id: string })
                   ]}
                 />
                 <ThemeSwitch value={theme} onChange={setTheme} />
-                <ButtonAnchor
-                  icon="external"
-                  href={absoluteUrl(frameSrc(component.url, theme))}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Open
-                </ButtonAnchor>
+                {openable ? (
+                  <ButtonAnchor
+                    icon="external"
+                    href={absoluteUrl(frameSrc(component.url, theme))}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Open
+                  </ButtonAnchor>
+                ) : null}
               </>
             ) : null
           }

@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'motion/react'
+import { useEffect, useState } from 'react'
 import { Store, useStore } from '../lib/store'
 import { Icon } from './icon'
 
@@ -17,8 +18,19 @@ export function toast(title: string, text?: string) {
   setTimeout(() => toasts.set((list) => list.filter((item) => item.id !== id)), 2200)
 }
 
+const hosts = new Store<number[]>([])
+let nextHost = 1
+
+/** Only the first mounted Toaster shows toasts: an app that embeds the viewer may keep its own. */
 export function Toaster() {
+  const [host] = useState(() => nextHost++)
+  useEffect(() => {
+    hosts.set((list) => [...list, host])
+    return () => hosts.set((list) => list.filter((item) => item !== host))
+  }, [host])
+  const shown = useStore(hosts, (list) => list[0] === host)
   const list = useStore(toasts)
+  if (!shown) return null
   return (
     <div className="pointer-events-none fixed bottom-5 left-1/2 z-[60] flex -translate-x-1/2 flex-col items-center gap-2">
       <AnimatePresence>
