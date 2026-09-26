@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { ensureThumb } from '../core/png'
 import type { SnapshotInfo, SnapshotLookup } from '../core/sources'
 import type { Theme } from '../shared/types'
 
@@ -39,8 +40,9 @@ export class SnapshotStore {
     return data
   }
 
-  url(canvas: string, id: string, theme: Theme, version: number) {
-    return `${this.urlBase}/${encodeURIComponent(canvas)}/${encodeURIComponent(id)}.${theme}.png?v=${version}`
+  url(canvas: string, id: string, theme: Theme, version: number, thumb = false) {
+    const name = `${encodeURIComponent(id)}.${theme}${thumb ? '.thumb' : ''}.png`
+    return `${this.urlBase}/${encodeURIComponent(canvas)}/${name}?v=${version}`
   }
 
   lookup: SnapshotLookup = (canvas, id): SnapshotInfo | null => {
@@ -48,9 +50,14 @@ export class SnapshotStore {
     const entry = this.load(canvas)[id]
     if (!entry) return null
     const urls: SnapshotInfo['urls'] = {}
-    if (entry.light) urls.light = this.url(canvas, id, 'light', entry.light)
-    if (entry.dark) urls.dark = this.url(canvas, id, 'dark', entry.dark)
-    return { urls, height: entry.height }
+    const thumbs: SnapshotInfo['urls'] = {}
+    for (const theme of ['light', 'dark'] as const) {
+      const version = entry[theme]
+      if (!version) continue
+      urls[theme] = this.url(canvas, id, theme, version)
+      thumbs[theme] = this.url(canvas, id, theme, version, true)
+    }
+    return { urls, thumbs, height: entry.height }
   }
 
   save(canvas: string, id: string, theme: Theme, png: Buffer, height?: number): { url: string } {
@@ -65,11 +72,12 @@ export class SnapshotStore {
     return { url: this.url(canvas, id, theme, version) }
   }
 
-  /** Absolute path of `<id>.<theme>.png`, or null. */
+  /** Absolute path of `<id>.<theme>.png`, or of its thumbnail for `<id>.<theme>.thumb.png` (made on first use); null when missing. */
   file(canvas: string, name: string): string | null {
-    const match = /^(@?[a-z0-9][a-z0-9_-]*)\.(light|dark)\.png$/i.exec(name)
+    const match = /^(@?[a-z0-9][a-z0-9_-]*)\.(light|dark)(\.thumb)?\.png$/i.exec(name)
     if (!isSafeSegment(canvas) || !match) return null
-    const file = path.join(this.dir, canvas, name)
-    return fs.existsSync(file) ? file : null
+    const file = path.join(this.dir, canvas, `${match[1]}.${match[2]}.png`)
+    if (!fs.existsSync(file)) return null
+    return match[3] ? ensureThumb(file) : file
   }
 }

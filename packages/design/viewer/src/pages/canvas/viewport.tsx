@@ -14,6 +14,12 @@ const MAX_LIVE = 12
 const MAX_KEEP = 20
 /** A frame narrower than this on screen stays a snapshot. */
 const MIN_LIVE_PX = 110
+/** Below this zoom every frame is a snapshot: too small to use, and each live one costs. */
+const MIN_LIVE_ZOOM = 0.2
+/** Up to this width on screen, in device pixels, a frame shows the small snapshot (320px wide, see core/png.ts). */
+const THUMB_MAX_PX = 400
+/** A page that does not fit at this zoom opens at its top instead of all at once. */
+const OPEN_FIT_MIN = 0.2
 /** Frames loading at once: the rest wait their turn, nearest the middle of the screen first. */
 const MAX_LOADING = 3
 /** A frame that has not reported ready by then stops holding a loading slot. */
@@ -26,6 +32,8 @@ const GRID_MAX = 96
 export type FrameMode = 'live' | 'asleep' | 'off'
 
 export interface ViewportApi {
+  /** The first view of a page: all of it, or its top when it is too big to see at once. */
+  openView(): void
   fitAll(animate?: boolean): void
   fitItem(id: string, animate?: boolean): void
   zoomBy(factor: number): void
@@ -106,6 +114,8 @@ export function Viewport({ layout, theme, store, camera, events, capture, apiRef
       grid.style.transform = `translate3d(${shift(c.x)}px, ${shift(c.y)}px, 0)`
       const tiny = c.z < 0.09
       if (store.get().zoomTiny !== tiny) store.set((state) => ({ ...state, zoomTiny: tiny }))
+      // Far out, section titles are a few pixels tall and run into the frame labels.
+      world.classList.toggle('far', c.z < 0.15)
       viewTimer ??= setTimeout(() => {
         viewTimer = undefined
         publishView()
@@ -141,13 +151,14 @@ export function Viewport({ layout, theme, store, camera, events, capture, apiRef
       const { w, h } = { w: root.clientWidth, h: root.clientHeight }
       const bounds = layout.bounds
       const fit = bounds.w && w ? Math.min((w - 160) / bounds.w, (h - 160) / Math.max(bounds.h, 1)) : 1
-      camera.minZoom = Math.min(0.25, Math.max(MIN_ZOOM, fit * 0.5))
+      // Capture shoots the whole page at once, however small that makes it.
+      camera.minZoom = capture ? 0.01 : Math.min(0.25, Math.max(MIN_ZOOM, fit * 0.5))
     }
     update()
     const resize = new ResizeObserver(update)
     resize.observe(root)
     return () => resize.disconnect()
-  }, [camera, layout.bounds])
+  }, [camera, layout.bounds, capture])
 
   // Imperative controls for the page: fit, zoom, focus.
   useEffect(() => {
@@ -155,10 +166,21 @@ export function Viewport({ layout, theme, store, camera, events, capture, apiRef
     const size = () => ({ w: root.clientWidth, h: root.clientHeight })
     apiRef.current = {
       size,
+      openView() {
+        const { w, h } = size()
+        const bounds = layout.bounds
+        if (!bounds.w) return
+        const fit = Math.min((w - 160) / bounds.w, (h - 160) / Math.max(bounds.h, 1))
+        if (fit >= OPEN_FIT_MIN) return this.fitAll(false)
+        // Too big to take in: start at the top left, sized to the first section's width.
+        const first = layout.sections[0] ?? bounds
+        const z = Math.min(0.5, Math.max(0.25, (w - 160) / Math.max(first.w, 1)))
+        camera.set({ z, x: 80 - bounds.x * z, y: 80 - bounds.y * z })
+      },
       fitAll(animate = true) {
         const { w, h } = size()
         if (!layout.bounds.w) return
-        const target = fitRect(layout.bounds, w, h, 80, 1)
+        const target = fitRect(layout.bounds, w, h, 80, 1, camera.minZoom)
         if (animate) camera.animateTo(target)
         else camera.set(target)
       },
@@ -166,7 +188,7 @@ export function Viewport({ layout, theme, store, camera, events, capture, apiRef
         const placed = layout.items.find((p) => p.item.id === id)
         if (!placed) return
         const { w, h } = size()
-        const target = fitRect(placed, w, h, 64, 1)
+        const target = fitRect(placed, w, h, 64, 1, camera.minZoom)
         if (animate) camera.animateTo(target)
         else camera.set(target)
       },
@@ -221,7 +243,7 @@ export function Viewport({ layout, theme, store, camera, events, capture, apiRef
     }
     const distance = (p: Placed) => Math.hypot(p.x + p.w / 2 - cx, p.y + p.h / 2 - cy)
     const visible = frames
-      .filter((p) => intersects(p, margin) && p.w * z >= MIN_LIVE_PX)
+      .filter((p) => z >= MIN_LIVE_ZOOM && intersects(p, margin) && p.w * z >= MIN_LIVE_PX)
       .sort((a, b) => overlap(b) - overlap(a) || distance(a) - distance(b))
       .slice(0, MAX_LIVE)
       .map((p) => p.item.id)
@@ -430,6 +452,7 @@ export function Viewport({ layout, theme, store, camera, events, capture, apiRef
                 key={item.id}
                 placed={placed as Placed & { item: ScreenItem | UrlItem }}
                 mode={modes.get(item.id) ?? 'off'}
+                thumb={!capture && !!view && placed.w * view.z * devicePixelRatio <= THUMB_MAX_PX}
                 theme={theme}
                 store={store}
                 events={events}

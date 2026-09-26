@@ -36,7 +36,11 @@ async function get<T>(url: string): Promise<T> {
 let staticSources: Promise<Record<string, string>> | null = null
 
 export const api = {
-  project: () => get<ProjectInfo>(STATIC ? 'api/project.json' : '/api/project'),
+  project: () =>
+    get<ProjectInfo>(STATIC ? 'api/project.json' : '/api/project').then((info) => {
+      logVersion(info.version)
+      return info
+    }),
   canvas: (id: string) =>
     get<CanvasDoc>(STATIC ? `api/canvas/${encodeURIComponent(id)}.json` : `/api/canvas/${encodeURIComponent(id)}`),
   system: () => get<SystemDoc>(STATIC ? 'api/system.json' : '/api/system'),
@@ -64,6 +68,14 @@ export const keys = {
   canvas: (id: string) => ['canvas', id] as const,
   system: ['system'] as const,
   source: (path: string) => ['source', path] as const,
+}
+
+let loggedVersion = ''
+/** Once per load, so "which version is this?" has an answer in the console. */
+function logVersion(version: string) {
+  if (loggedVersion === version) return
+  loggedVersion = version
+  console.info(`foss-design ${version}${STATIC ? ' (static build)' : ''}`)
 }
 
 export function useProject() {

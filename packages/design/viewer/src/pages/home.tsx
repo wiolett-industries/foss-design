@@ -113,7 +113,9 @@ export function HomePage() {
           STATIC ? (
             `Snapshot built with foss-design ${project.version}`
           ) : (
-            <Mono size={12.5}>{project.root}/.design</Mono>
+            <>
+              <Mono size={12.5}>{project.root}/.design</Mono> · foss-design {project.version}
+            </>
           )
         }
       />

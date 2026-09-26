@@ -13,7 +13,7 @@ export async function runStatus(paths: DesignPaths) {
 
   print(
     server
-      ? `${label('Preview')}${green('running')} ${server.url} ${dim(`(pid ${server.pid}, since ${new Date(server.startedAt).toLocaleString()})`)}`
+      ? `${label('Preview')}${green('running')} ${server.url} ${dim(`(foss-design ${server.version}, pid ${server.pid}, since ${new Date(server.startedAt).toLocaleString()})`)}`
       : `${label('Preview')}${dim('not running — `design preview` starts it')}`,
   )
   print(`${label('Project')}${project.name()} ${dim(paths.root)}`)

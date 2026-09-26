@@ -3,6 +3,7 @@ import path from 'node:path'
 import { build } from 'vite'
 import type { ResolvedCanvas } from '../core/canvas'
 import type { DesignPaths } from '../core/paths'
+import { ensureThumb } from '../core/png'
 import { DesignProject } from '../core/project'
 import { type ScreenSource, type SnapshotLookup, STATIC_URLS } from '../core/sources'
 import { SYSTEM_CANVAS } from '../core/system'
@@ -53,14 +54,19 @@ function staticSnapshots(paths: DesignPaths) {
     const entry = meta(canvas)[id]
     if (!entry) return null
     const urls: Partial<Record<Theme, string>> = {}
+    const thumbs: Partial<Record<Theme, string>> = {}
     for (const theme of THEMES) {
       const file = path.join(paths.snapshots, canvas, `${id}.${theme}.png`)
       if (!entry[theme] || !fs.existsSync(file)) continue
       const rel = `_snap/${canvas}/${id}.${theme}.png`
       copies.set(file, rel)
       urls[theme] = `${encodePath(rel)}?v=${entry[theme]}`
+      const thumb = ensureThumb(file)
+      const thumbRel = thumb === file ? rel : `_snap/${canvas}/${id}.${theme}.thumb.png`
+      copies.set(thumb, thumbRel)
+      thumbs[theme] = `${encodePath(thumbRel)}?v=${entry[theme]}`
     }
-    return { urls, height: entry.height }
+    return { urls, thumbs, height: entry.height }
   }
   return { lookup, copies }
 }

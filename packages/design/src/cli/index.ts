@@ -20,7 +20,8 @@ ${bold('Project')}
 
 ${bold('Preview')}
   preview [--open [path]] [--port <n>]       Start the viewer in the background on a free port (or reuse
-                                             it) and print its URL; --open also opens a browser
+                                             it; one from another version restarts) and print its URL;
+                                             --open also opens a browser
           [--restart] [--foreground]
   stop                                       Stop the viewer
   status                                     Viewer state and a project summary

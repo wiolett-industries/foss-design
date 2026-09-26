@@ -12,9 +12,13 @@ export function Mark({ size = 24 }: { size?: number }) {
   )
 }
 
-export function Wordmark({ name }: { name?: string }) {
+export function Wordmark({ name, version }: { name?: string; version?: string }) {
   return (
-    <Link href="/" className="flex min-w-0 items-center gap-2 text-[14px] font-semibold text-ink no-underline">
+    <Link
+      href="/"
+      title={version ? `foss-design ${version}` : undefined}
+      className="flex min-w-0 items-center gap-2 text-[14px] font-semibold text-ink no-underline"
+    >
       <Mark />
       <span className="truncate">{name ?? 'Design'}</span>
     </Link>

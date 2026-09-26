@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
-import { type DesignPaths, PKG } from '../../core/paths'
+import { type DesignPaths, PKG, packageVersion } from '../../core/paths'
 import { DesignProject } from '../../core/project'
 import { DEV_URLS } from '../../core/sources'
 import { startDevServer } from '../../server'
@@ -64,7 +64,11 @@ export async function ensureServer(
   options: { port?: number; restart?: boolean },
 ): Promise<ServerState> {
   const live = await liveServer(paths)
-  if (live && !options.restart) return live
+  // A server left running by another foss-design version would serve its old viewer and runtime.
+  const stale = live && live.version !== packageVersion()
+  if (live && !options.restart && !stale) return live
+  if (stale)
+    print(dim(`Restarting the preview server: it runs foss-design ${live.version}, this is ${packageVersion()}.`))
   if (live) await stopServer(paths)
   fs.mkdirSync(paths.cache, { recursive: true })
   const log = fs.openSync(logFile(paths), 'w')

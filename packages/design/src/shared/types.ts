@@ -74,6 +74,8 @@ export interface ScreenItem extends ItemBase {
   /** Changes when anything that needs a reload changes: props, theme, stylesheet. */
   rev: string
   snapshots?: Partial<Record<Theme, string>>
+  /** The snapshots shrunk to a few hundred pixels wide, for the zoomed-out canvas. */
+  thumbs?: Partial<Record<Theme, string>>
   /** Last content height the screen reported, for `auto` frames before they load. */
   measuredHeight?: number
 }

@@ -466,6 +466,10 @@
   will-change: transform;
 }
 
+.canvas-world.far .canvas-section {
+  visibility: hidden;
+}
+
 /* While the canvas pans, frames must not swallow the pointer. */
 .canvas-panning iframe {
   pointer-events: none;

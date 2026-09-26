@@ -106,8 +106,8 @@ function CanvasView({ canvas, page }: { canvas: CanvasDoc; page: Page | undefine
     if (focus) {
       store.set((state) => ({ ...state, selected: focus }))
       requestAnimationFrame(() => apiRef.current?.fitItem(focus, false))
-    } else if (saved) camera.set(saved)
-    else requestAnimationFrame(() => apiRef.current?.fitAll(false))
+    } else if (saved && saved.z >= camera.minZoom) camera.set(saved)
+    else requestAnimationFrame(() => (CAPTURE ? apiRef.current?.fitAll(false) : apiRef.current?.openView()))
   }, [layout, camera, key, canvas.id, store])
 
   useEffect(() => {

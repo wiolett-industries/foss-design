@@ -38,6 +38,7 @@ function deviceIcon(width: number) {
 export const FrameItem = memo(function FrameItem({
   placed,
   mode,
+  thumb,
   theme,
   store,
   events,
@@ -45,6 +46,8 @@ export const FrameItem = memo(function FrameItem({
 }: {
   placed: Placed & { item: ScreenItem | UrlItem }
   mode: FrameMode
+  /** Small on screen: show the small snapshot. */
+  thumb: boolean
   theme: Theme
   store: ViewStore
   events: FrameEvents
@@ -114,10 +117,10 @@ export const FrameItem = memo(function FrameItem({
     if (item.kind === 'screen') sendTheme(ref.current, frameTheme)
   }, [frameTheme, item.kind])
 
-  const snapshot =
-    item.kind === 'screen'
-      ? (item.snapshots?.[frameTheme] ?? item.snapshots?.[frameTheme === 'dark' ? 'light' : 'dark'])
-      : undefined
+  const other = frameTheme === 'dark' ? 'light' : 'dark'
+  const pick = (set?: Partial<Record<Theme, string>>) => set?.[frameTheme] ?? set?.[other]
+  const full = item.kind === 'screen' ? pick(item.snapshots) : undefined
+  const snapshot = thumb && item.kind === 'screen' ? (pick(item.thumbs) ?? full) : full
   // Asleep: still mounted, so it keeps its state, but hidden behind its snapshot and skipped by
   // rendering, which also stops its animations. Without a snapshot it stays in view as it is.
   const asleep = mode === 'asleep' && ready && !!snapshot
@@ -261,7 +264,11 @@ export const SectionHeader = memo(function SectionHeader({
   const ref = useMeasure(store, `section:${section.id}`)
   if (!section.title && !section.description) return null
   return (
-    <div ref={ref} className="absolute" style={{ left: x, top: y, width: Math.min(Math.max(w, 720), 1400) }}>
+    <div
+      ref={ref}
+      className="canvas-section absolute"
+      style={{ left: x, top: y, width: Math.min(Math.max(w, 720), 1400) }}
+    >
       {section.title ? (
         <div className="text-[40px] leading-[1.15] font-semibold tracking-[-0.015em] text-ink">{section.title}</div>
       ) : null}

@@ -12,7 +12,8 @@ export interface Rect {
   h: number
 }
 
-export const MIN_ZOOM = 0.02
+/** The farthest out the camera goes; past it a page is specks, and every one of them still costs. */
+export const MIN_ZOOM = 0.1
 export const MAX_ZOOM = 8
 
 const clampZoom = (z: number, min = MIN_ZOOM) => Math.min(MAX_ZOOM, Math.max(min, z))
@@ -90,10 +91,16 @@ export class CameraStore {
   }
 }
 
-/** The camera that shows `rect` inside a viewport of `w`×`h` with `pad` screen pixels around it. */
-export function fitRect(rect: Rect, w: number, h: number, pad = 72, maxZoom = 1): Camera {
-  const z = clampZoom(Math.min((w - pad * 2) / Math.max(rect.w, 1), (h - pad * 2) / Math.max(rect.h, 1), maxZoom))
-  return { z, x: w / 2 - (rect.x + rect.w / 2) * z, y: h / 2 - (rect.y + rect.h / 2) * z }
+/**
+ * The camera that shows `rect` inside a viewport of `w`×`h` with `pad` screen pixels around it.
+ * When `rect` does not fit even at `minZoom`, it lines up with the top (and the left, if it is too wide).
+ */
+export function fitRect(rect: Rect, w: number, h: number, pad = 72, maxZoom = 1, minZoom = MIN_ZOOM): Camera {
+  const fit = Math.min((w - pad * 2) / Math.max(rect.w, 1), (h - pad * 2) / Math.max(rect.h, 1), maxZoom)
+  const z = clampZoom(fit, minZoom)
+  const place = (start: number, size: number, room: number) =>
+    size * z <= room - pad * 2 ? room / 2 - (start + size / 2) * z : pad - start * z
+  return { z, x: place(rect.x, rect.w, w), y: place(rect.y, rect.h, h) }
 }
 
 export function intersects(a: Rect, b: Rect) {

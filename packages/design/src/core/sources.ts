@@ -43,6 +43,8 @@ export const STATIC_URLS: UrlScheme = {
 
 export interface SnapshotInfo {
   urls: Partial<Record<Theme, string>>
+  /** Small versions of the same snapshots, for frames seen from far away. */
+  thumbs?: Partial<Record<Theme, string>>
   height?: number
 }
 

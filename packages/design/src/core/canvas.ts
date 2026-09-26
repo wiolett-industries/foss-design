@@ -172,6 +172,7 @@ export function loadCanvas(
         missing: missing || undefined,
         rev,
         snapshots: snap?.urls,
+        thumbs: snap?.thumbs,
         measuredHeight: snap?.height,
       }
     }
