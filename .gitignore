@@ -1,0 +1,14 @@
+node_modules/
+dist/
+/.design/
+.DS_Store
+*.tsbuildinfo
+*.log
+.workflow/
+coverage/
+*.tar.gz
+*.tmp.mjs
+# Example projects keep their .design folders; only the caches stay out.
+**/.design/.cache/
+**/.design/node_modules/
+/.tmp/

@@ -1,0 +1,46 @@
+{
+  "title": "Onboarding",
+  "description": "First-run flow for the Demo app: sign-up on phones, the first dashboard on desktop, and the marketing page that sends people there.",
+  "pages": [
+    {
+      "id": "flow",
+      "title": "Phone flow",
+      "sections": [
+        {
+          "title": "Sign up",
+          "description": "Four steps from the welcome screen to the first session. Click a screen to use it; **Continue** moves to the next one.",
+          "items": [
+            { "src": "screens/Welcome.tsx", "device": "phone" },
+            { "src": "screens/SignUp.tsx", "device": "phone", "title": "Sign up" },
+            { "src": "screens/Verify.tsx", "device": "phone", "title": "Verify email" },
+            { "src": "screens/Done.tsx", "device": "phone", "title": "All set" },
+            {
+              "type": "note",
+              "text": "**Open question:** do we ask for a name on step 2, or after the first session? Fewer fields → +8% completion in the last test."
+            }
+          ]
+        },
+        {
+          "title": "States",
+          "items": [
+            { "id": "sign-up-error", "src": "screens/SignUp.tsx", "device": "phone", "title": "Sign up · error", "props": { "state": "error" } },
+            { "id": "sign-up-dark", "src": "screens/SignUp.tsx", "device": "phone", "title": "Sign up · dark", "theme": "dark" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "desktop",
+      "title": "Desktop",
+      "sections": [
+        {
+          "title": "First session",
+          "items": [
+            { "src": "screens/Dashboard.tsx", "device": "desktop" },
+            { "src": "screens/landing/index.html", "width": 1280, "height": "auto", "title": "Landing page" }
+          ]
+        }
+      ]
+    }
+  ]
+}

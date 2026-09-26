@@ -1,0 +1,17 @@
+{
+  "$schema": "https://www.schemastore.org/claude-code-marketplace.json",
+  "name": "foss-design",
+  "description": "Local design canvases and design systems for coding agents.",
+  "owner": {
+    "name": "Wiolett Industries",
+    "url": "https://github.com/wiolett-industries"
+  },
+  "plugins": [
+    {
+      "name": "foss-design",
+      "description": "Design screens, flows and prototypes on a local canvas and keep a design system in .design, previewed with the foss-design CLI.",
+      "source": "./",
+      "category": "development"
+    }
+  ]
+}

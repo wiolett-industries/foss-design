@@ -1,0 +1,242 @@
+/** Contracts shared by the server, the static build and the viewer. */
+
+export type Theme = 'light' | 'dark'
+
+export interface Issue {
+  severity: 'error' | 'warning'
+  /** Path relative to the project root. */
+  file: string
+  message: string
+  /** Where in the file, such as `pages[0].sections[1].items[2].src`. */
+  at?: string
+}
+
+export interface ProjectInfo {
+  name: string
+  root: string
+  /** True in a static build: no live reload, no snapshots, hash routing. */
+  static: boolean
+  version: string
+  system: SystemSummary | null
+  canvases: CanvasSummary[]
+  issues: Issue[]
+}
+
+export interface SystemSummary {
+  name: string
+  description?: string
+  tokens: number
+  components: number
+  guidelines: number
+  issues: number
+}
+
+export interface CanvasSummary {
+  id: string
+  title: string
+  description?: string
+  pages: number
+  screens: number
+  updatedAt: number
+  issues: number
+  /** A snapshot of the first screen, for the canvas card. */
+  cover?: string
+}
+
+export interface FrameSize {
+  width: number
+  /** `auto` grows the frame to the screen's content. */
+  height: number | 'auto'
+  device?: string
+}
+
+interface ItemBase {
+  id: string
+  title: string
+  description?: string
+  /** Free-layout position on the page, in canvas pixels. */
+  x?: number
+  y?: number
+}
+
+export interface ScreenItem extends ItemBase {
+  kind: 'screen'
+  /** Source path relative to the canvas folder, as written in canvas.json. */
+  src: string
+  /** Source path relative to the project root. */
+  file: string
+  format: 'module' | 'html'
+  /** Frame URL without the theme parameter. */
+  url: string
+  frame: FrameSize
+  theme?: Theme
+  missing?: boolean
+  /** Changes when anything that needs a reload changes: props, theme, stylesheet. */
+  rev: string
+  snapshots?: Partial<Record<Theme, string>>
+  /** Last content height the screen reported, for `auto` frames before they load. */
+  measuredHeight?: number
+}
+
+export interface UrlItem extends ItemBase {
+  kind: 'url'
+  url: string
+  frame: FrameSize
+}
+
+export interface NoteItem extends ItemBase {
+  kind: 'note'
+  /** Markdown. */
+  text: string
+  width: number
+  tone: 'note' | 'plain'
+}
+
+export interface ImageItem extends ItemBase {
+  kind: 'image'
+  url: string
+  width?: number
+  missing?: boolean
+}
+
+export type CanvasItem = ScreenItem | UrlItem | NoteItem | ImageItem
+
+export interface CanvasSection {
+  id: string
+  title?: string
+  description?: string
+  /** Wrap the row after this many items. */
+  columns?: number
+  items: CanvasItem[]
+}
+
+export interface CanvasPage {
+  id: string
+  title: string
+  description?: string
+  layout: 'sections' | 'free'
+  sections: CanvasSection[]
+}
+
+export interface CanvasDoc {
+  id: string
+  title: string
+  description?: string
+  theme?: Theme
+  pages: CanvasPage[]
+  issues: Issue[]
+  updatedAt: number
+}
+
+export type TokenKind =
+  | 'color'
+  | 'font'
+  | 'text'
+  | 'weight'
+  | 'leading'
+  | 'tracking'
+  | 'spacing'
+  | 'radius'
+  | 'shadow'
+  | 'blur'
+  | 'ease'
+  | 'animation'
+  | 'duration'
+  | 'breakpoint'
+  | 'other'
+
+export interface TokenValue {
+  /** As written. */
+  raw: string
+  /** With `var()` references substituted. */
+  value: string
+}
+
+export interface Token {
+  /** The variable screens use, such as `--ink` or `--color-brand`. */
+  name: string
+  kind: TokenKind
+  group: string
+  description?: string
+  light?: TokenValue
+  dark?: TokenValue
+  /** Tailwind theme key, such as `ink` for `--color-ink` (bg-ink, text-ink). */
+  utility?: string
+  /** Line height paired with a text size (`--text-sm--line-height`). */
+  lineHeight?: string
+}
+
+export interface ComponentDoc {
+  id: string
+  title: string
+  group: string
+  description?: string
+  status?: string
+  /** Specimen path relative to the project root. */
+  specimen: string
+  /** Component source paths relative to the project root. */
+  sources: string[]
+  url: string
+}
+
+export interface GuidelineDoc {
+  slug: string
+  title: string
+  order: number
+  markdown: string
+}
+
+export interface AssetDoc {
+  name: string
+  /** Path relative to the system folder. */
+  path: string
+  url: string
+  size: number
+  kind: 'image' | 'font' | 'other'
+}
+
+export interface SystemDoc {
+  name: string
+  description?: string
+  /** Stylesheet URLs (web fonts) the screens load. */
+  fonts: string[]
+  tokens: Token[]
+  components: ComponentDoc[]
+  guidelines: GuidelineDoc[]
+  assets: AssetDoc[]
+  /** Frame URL of the built-in typography specimen. */
+  typographyUrl: string | null
+  issues: Issue[]
+}
+
+/** What the server pushes over /api/events. */
+export type DesignEvent =
+  | { type: 'project' }
+  | { type: 'canvas'; id: string }
+  | { type: 'system' }
+  | { type: 'snapshot'; canvas: string; id: string; theme: Theme; url: string; height?: number }
+
+/** Messages between the viewer and the runtime inside each frame. */
+export type RuntimeMessage =
+  | { source: 'design-runtime'; key: string; type: 'ready' }
+  | { source: 'design-runtime'; key: string; type: 'size'; width: number; height: number }
+  | { source: 'design-runtime'; key: string; type: 'error'; message: string }
+  | { source: 'design-runtime'; key: string; type: 'go'; target: string }
+  | {
+      source: 'design-runtime'
+      key: string
+      type: 'wheel'
+      deltaX: number
+      deltaY: number
+      x: number
+      y: number
+      /** Pinch or ctrl/⌘-wheel: zoom the canvas; otherwise pan it. */
+      zoom: boolean
+    }
+  | { source: 'design-runtime'; key: string; type: 'keydown'; code: string }
+  | { source: 'design-runtime'; key: string; type: 'updated' }
+
+export type ViewerMessage =
+  | { source: 'design-viewer'; type: 'theme'; theme: Theme }
+  /** The frame is on the canvas: pan and zoom with the wheel go to the viewer. */
+  | { source: 'design-viewer'; type: 'canvas' }

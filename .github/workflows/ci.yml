@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Lint
+        run: pnpm exec biome ci .
+      - name: Versions agree
+        run: node scripts/versions.mjs
+      - name: Plugin manifests parse
+        run: |
+          for file in .claude-plugin/plugin.json .claude-plugin/marketplace.json .codex-plugin/plugin.json .agents/plugins/marketplace.json; do
+            node -e "JSON.parse(require('fs').readFileSync('$file', 'utf8'))" || { echo "::error file=$file::invalid JSON"; exit 1; }
+          done
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Build
+        run: pnpm build

@@ -1,0 +1,29 @@
+{
+  "name": "foss-design",
+  "version": "0.1.0",
+  "description": "Design canvases and design systems on your machine: live, animated, clickable screens on an infinite canvas, kept in a gitignored .design folder and previewed locally. Two skills: designing-canvases and building-design-systems.",
+  "author": {
+    "name": "Wiolett Industries",
+    "url": "https://github.com/wiolett-industries"
+  },
+  "homepage": "https://github.com/wiolett-industries/foss-design",
+  "repository": "https://github.com/wiolett-industries/foss-design",
+  "license": "MIT",
+  "keywords": ["design", "canvas", "design-system", "prototype", "mockup", "tokens", "tailwind", "react"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "foss-design",
+    "shortDescription": "Design canvases and design systems",
+    "longDescription": "Design UI as real, live screens: React or HTML pages with animations, forms and navigation, laid out on an infinite canvas with pages, notes and a play mode. Keep the design system (tokens, components with live specimens, guidelines, assets) next to them in a gitignored .design folder, check every screen in Chrome, screenshot it for review, and preview everything in a local viewer. No accounts, no uploads, no size limits.",
+    "developerName": "Wiolett Industries",
+    "category": "Developer Tools",
+    "capabilities": ["Instructions"],
+    "websiteURL": "https://github.com/wiolett-industries/foss-design",
+    "defaultPrompt": [
+      "Design the onboarding flow for this app on a canvas.",
+      "Extract this project's design system into .design/system.",
+      "Show me three directions for the pricing page."
+    ],
+    "brandColor": "#A55700"
+  }
+}

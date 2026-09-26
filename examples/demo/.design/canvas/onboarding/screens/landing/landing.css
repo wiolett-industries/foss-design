@@ -1,0 +1,22 @@
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-sans); }
+.nav { display: flex; align-items: center; gap: 32px; padding: 20px 64px; }
+.nav nav { display: flex; gap: 24px; margin-right: auto; }
+.nav a { color: var(--ink-2); text-decoration: none; }
+.hero { text-align: center; padding: 96px 64px 64px; }
+.hero h1 { font-size: 64px; line-height: 1.05; letter-spacing: -0.03em; margin: 0; animation: rise 0.8s cubic-bezier(.2,.7,.2,1) both; }
+.hero p { font-size: 20px; color: var(--muted); margin: 20px 0 32px; animation: rise 0.8s 0.1s cubic-bezier(.2,.7,.2,1) both; }
+.cta { display: inline-flex; align-items: center; height: 48px; padding: 0 22px; border-radius: 6px; background: var(--accent); color: var(--accent-ink); text-decoration: none; font-weight: 500; }
+.cta.small { height: 36px; padding: 0 14px; }
+.shot { margin: 64px auto 0; width: 880px; height: 420px; border-radius: 12px; background: var(--surface); border: 1px solid var(--rule); box-shadow: 0 30px 80px rgb(16 24 40 / .12); overflow: hidden; animation: rise 1s 0.2s cubic-bezier(.2,.7,.2,1) both; }
+.shot .bar { height: 44px; border-bottom: 1px solid var(--rule); background: var(--soft); }
+.shot .rows { display: grid; gap: 14px; padding: 28px; }
+.shot .rows span { height: 18px; border-radius: 4px; background: var(--soft); animation: shimmer 2.4s infinite; }
+.shot .rows span:nth-child(2) { width: 80%; } .shot .rows span:nth-child(3) { width: 60%; } .shot .rows span:nth-child(4) { width: 72%; }
+.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; padding: 64px; }
+.grid article { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 28px; }
+.grid h3 { margin: 0 0 8px; font-size: 18px; } .grid p { margin: 0; color: var(--muted); line-height: 1.5; }
+.quote { text-align: center; padding: 48px 64px 96px; }
+.quote blockquote { font-size: 30px; margin: 0; letter-spacing: -0.01em; } .quote cite { display: block; margin-top: 16px; color: var(--muted); font-style: normal; }
+footer { border-top: 1px solid var(--rule); padding: 24px 64px; color: var(--muted); font-size: 13px; }
+@keyframes rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+@keyframes shimmer { 50% { opacity: .5; } }

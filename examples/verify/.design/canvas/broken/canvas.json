@@ -1,0 +1,5 @@
+{ "title": "Broken", "pages": [ { "id": "p", "title": "P", "sections": [ { "items": [
+  { "src": "screens/Missing.tsx" },
+  { "src": "screens/Crash.tsx", "device": "phone", "colour": "red" },
+  { "src": "screens/Crash.tsx", "device": "phone" }
+] } ] } ] }

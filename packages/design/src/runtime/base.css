@@ -1,0 +1,8 @@
+/* Loaded into every screen before the design system's own stylesheet. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@layer base {
+  #root {
+    display: flow-root;
+  }
+}

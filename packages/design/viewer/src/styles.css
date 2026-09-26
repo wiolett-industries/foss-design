@@ -1,0 +1,456 @@
+@import "tailwindcss";
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* Tokens follow the Quorum UI kit. */
+:root {
+  --bg: #edeff2;
+  --surface: #ffffff;
+  --soft: #f5f6f8;
+  --soft2: #e8ebef;
+  --ink: #1b1f24;
+  --ink2: #3a414a;
+  --muted: #59626d;
+  --rule: #dce0e5;
+  --rule-strong: #b5bcc5;
+  --action: #a55700;
+  --action-soft: #fbebd6;
+  --action-line: #edcb9c;
+  --ok: #1f7045;
+  --ok-text: #1f7045;
+  --ok-soft: #e2f1e8;
+  --danger: #b42318;
+  --danger-text: #b42318;
+  --danger-soft: #fce8e6;
+  --on-danger: #ffffff;
+  --primary: #1b1f24;
+  --primary-ink: #ffffff;
+  --track: #d6dae0;
+  --overlay: rgba(27, 31, 36, 0.4);
+  --shadow-pop: 0 16px 40px rgba(27, 31, 36, 0.16);
+  --shadow-frame: 0 1px 2px rgba(27, 31, 36, 0.06), 0 8px 24px rgba(27, 31, 36, 0.06);
+  --grid-dot: #c9ced5;
+  --note: #fdf3e3;
+  --note-line: #edd6b1;
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --bg: #141619;
+  --surface: #1b1e22;
+  --soft: #202328;
+  --soft2: #2a2e34;
+  --ink: #e6e8eb;
+  --ink2: #c3c8ce;
+  --muted: #8a929c;
+  --rule: #2a2e34;
+  --rule-strong: #474d55;
+  --action: #f0a040;
+  --action-soft: #35280f;
+  --action-line: #6b4a17;
+  --ok: #58bd86;
+  --ok-text: #6ccb97;
+  --ok-soft: #183024;
+  --danger: #e5645a;
+  --danger-text: #f28b82;
+  --danger-soft: #3a1d1a;
+  --on-danger: #1a0b09;
+  --primary: #e6e8eb;
+  --primary-ink: #141619;
+  --track: #2a2e34;
+  --overlay: rgba(0, 0, 0, 0.55);
+  --shadow-pop: 0 16px 40px rgba(0, 0, 0, 0.5);
+  --shadow-frame: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.25);
+  --grid-dot: #30343a;
+  --note: #2a2415;
+  --note-line: #574420;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-soft: var(--soft);
+  --color-soft2: var(--soft2);
+  --color-ink: var(--ink);
+  --color-ink2: var(--ink2);
+  --color-muted: var(--muted);
+  --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
+  --color-action: var(--action);
+  --color-action-soft: var(--action-soft);
+  --color-action-line: var(--action-line);
+  --color-ok: var(--ok);
+  --color-ok-text: var(--ok-text);
+  --color-ok-soft: var(--ok-soft);
+  --color-danger: var(--danger);
+  --color-danger-text: var(--danger-text);
+  --color-danger-soft: var(--danger-soft);
+  --color-on-danger: var(--on-danger);
+  --color-primary: var(--primary);
+  --color-primary-ink: var(--primary-ink);
+  --color-track: var(--track);
+  --color-overlay: var(--overlay);
+  --color-note: var(--note);
+  --color-note-line: var(--note-line);
+
+  --shadow-pop: var(--shadow-pop);
+  --shadow-frame: var(--shadow-frame);
+}
+
+@layer base {
+  html,
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.45;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+  }
+
+  #root {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  button {
+    font: inherit;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--action);
+    outline-offset: 2px;
+  }
+
+  /* Scroll containers clip anything outside them: draw focus rings inside. */
+  :where(.overflow-y-auto, .overflow-auto, .overflow-hidden) :focus-visible {
+    outline-offset: -2px;
+  }
+
+  ::selection {
+    background: var(--action-soft);
+  }
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Controls are 32px on desktop and 40px on phones. */
+@utility h-ctrl {
+  height: 32px;
+  @media (max-width: 767px) {
+    height: 40px;
+  }
+}
+
+@utility w-ctrl {
+  width: 32px;
+  @media (max-width: 767px) {
+    width: 40px;
+  }
+}
+
+@utility text-ctrl {
+  font-size: 13.5px;
+  @media (max-width: 767px) {
+    font-size: 14px;
+  }
+}
+
+@utility px-ctrl {
+  padding-inline: 12px;
+  @media (max-width: 767px) {
+    padding-inline: 14px;
+  }
+}
+
+/* A checkerboard behind transparent images. */
+@utility checker {
+  background-color: var(--surface);
+  background-image:
+    linear-gradient(45deg, var(--soft2) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--soft2) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--soft2) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--soft2) 75%);
+  background-size: 16px 16px;
+  background-position:
+    0 0,
+    0 8px,
+    8px -8px,
+    -8px 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    /* biome-ignore lint/complexity/noImportantStyles: reduced motion must win over component styles */
+    animation-duration: 0.01ms !important;
+    /* biome-ignore lint/complexity/noImportantStyles: reduced motion must win over component styles */
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@keyframes q-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes q-pop-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-2px) scale(0.98);
+  }
+}
+
+@keyframes q-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Markdown from guidelines, notes and descriptions. */
+.prose {
+  color: var(--ink2);
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.prose > :first-child {
+  margin-top: 0;
+}
+.prose > :last-child {
+  margin-bottom: 0;
+}
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4 {
+  color: var(--ink);
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 1.6em 0 0.5em;
+}
+.prose h1 {
+  font-size: 22px;
+  letter-spacing: -0.01em;
+}
+.prose h2 {
+  font-size: 17px;
+}
+.prose h3 {
+  font-size: 15px;
+}
+.prose p,
+.prose ul,
+.prose ol,
+.prose pre,
+.prose table,
+.prose blockquote {
+  margin: 0 0 0.9em;
+}
+.prose ul,
+.prose ol {
+  padding-left: 1.3em;
+}
+.prose ul {
+  list-style: disc;
+}
+.prose ol {
+  list-style: decimal;
+}
+.prose li + li {
+  margin-top: 0.25em;
+}
+.prose li::marker {
+  color: var(--muted);
+}
+.prose strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+.prose a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--rule-strong);
+  text-underline-offset: 3px;
+}
+.prose a:hover {
+  text-decoration-color: var(--ink2);
+}
+.prose code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--soft2);
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
+}
+.prose pre {
+  background: var(--soft);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.prose pre code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+}
+.prose blockquote {
+  border-left: 2px solid var(--rule-strong);
+  padding-left: 12px;
+  color: var(--muted);
+}
+.prose hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+  margin: 1.5em 0;
+}
+.prose table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+.prose th,
+.prose td {
+  border-top: 1px solid var(--rule);
+  padding: 6px 10px 6px 0;
+  text-align: left;
+  vertical-align: top;
+}
+.prose th {
+  color: var(--muted);
+  font-weight: 500;
+}
+.prose img {
+  max-width: 100%;
+  border-radius: 6px;
+}
+
+/* Larger text on the canvas: notes and section descriptions are read zoomed out. */
+.prose.prose-note {
+  font-size: 17px;
+  line-height: 1.55;
+}
+.prose.prose-plain {
+  font-size: 20px;
+  line-height: 1.5;
+}
+
+/* sugar-high code colors. */
+:root {
+  --sh-class: #7a4a00;
+  --sh-identifier: #1b1f24;
+  --sh-sign: #59626d;
+  --sh-property: #1f5a8a;
+  --sh-entity: #6d3fa0;
+  --sh-jsxliterals: #1b1f24;
+  --sh-string: #1f7045;
+  --sh-keyword: #a55700;
+  --sh-comment: #8d959f;
+}
+:root[data-theme="dark"] {
+  --sh-class: #f0c070;
+  --sh-identifier: #e6e8eb;
+  --sh-sign: #8a929c;
+  --sh-property: #7fb8e6;
+  --sh-entity: #c49cf0;
+  --sh-jsxliterals: #e6e8eb;
+  --sh-string: #6ccb97;
+  --sh-keyword: #f0a040;
+  --sh-comment: #6e7680;
+}
+
+/* The canvas. */
+.canvas-dots {
+  background-color: var(--bg);
+  background-image: radial-gradient(circle, var(--grid-dot) 1px, transparent 1.2px);
+}
+
+.canvas-world {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+}
+
+.canvas-world.moving {
+  will-change: transform;
+}
+
+/* While the canvas pans, frames must not swallow the pointer. */
+.canvas-panning iframe {
+  pointer-events: none;
+}
+
+.canvas-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.canvas-overlay [data-at] {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(
+    calc(var(--x) * var(--z) * 1px + var(--tx) * 1px),
+    calc(var(--y) * var(--z) * 1px + var(--ty) * 1px)
+  );
+}
+
+.canvas-overlay .frame-label {
+  width: calc(var(--w) * var(--z) * 1px);
+  translate: 0 -100%;
+  container-type: inline-size;
+}
+
+/* A narrow frame on screen keeps its name and drops the size. */
+@container (max-width: 250px) {
+  .frame-device {
+    display: none;
+  }
+}
+
+.canvas-overlay .frame-outline {
+  width: calc(var(--w) * var(--z) * 1px);
+  height: calc(var(--h) * var(--z) * 1px);
+}
+
+.canvas-overlay[data-tiny="true"] .frame-label {
+  display: none;
+}

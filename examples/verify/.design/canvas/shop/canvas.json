@@ -1,0 +1,68 @@
+{
+  "title": "Shop",
+  "pages": [
+    {
+      "id": "flow",
+      "title": "Flow",
+      "sections": [
+        {
+          "title": "Checkout",
+          "items": [
+            {
+              "src": "screens/Main.tsx",
+              "device": "desktop"
+            },
+            {
+              "id": "cart-empty",
+              "src": "screens/Cart.tsx",
+              "device": "phone",
+              "props": {
+                "count": 0
+              }
+            },
+            {
+              "id": "cart-full",
+              "src": "screens/Cart.tsx",
+              "device": "phone",
+              "props": {
+                "count": 3
+              }
+            },
+            {
+              "src": "screens/landing/index.html",
+              "device": "laptop"
+            },
+            {
+              "src": "screens/Long.tsx",
+              "width": 800,
+              "height": "auto"
+            },
+            {
+              "src": "screens/Dark.tsx",
+              "device": "phone",
+              "theme": "dark"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "board",
+      "title": "Board",
+      "items": [
+        {
+          "type": "note",
+          "text": "# Moodboard\nNotes go here.",
+          "x": 0,
+          "y": 0
+        },
+        {
+          "type": "image",
+          "src": "assets/mood.svg",
+          "x": 400,
+          "y": 0
+        }
+      ]
+    }
+  ]
+}

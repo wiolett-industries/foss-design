@@ -1,0 +1,87 @@
+{
+  "name": "foss-design",
+  "version": "0.1.0",
+  "description": "Design canvases and design systems for coding agents: live, animated, clickable screens on an infinite canvas, served locally from a .design folder.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Wiolett Industries",
+  "homepage": "https://github.com/wiolett-industries/foss-design#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wiolett-industries/foss-design.git",
+    "directory": "packages/design"
+  },
+  "bugs": {
+    "url": "https://github.com/wiolett-industries/foss-design/issues"
+  },
+  "keywords": [
+    "design",
+    "canvas",
+    "design-system",
+    "prototype",
+    "mockup",
+    "agents",
+    "claude-code",
+    "codex",
+    "vite"
+  ],
+  "bin": {
+    "foss-design": "./dist/cli.js",
+    "design": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    "./runtime": "./dist/runtime/index.js",
+    "./package.json": "./package.json"
+  },
+  "engines": {
+    "node": ">=20.19"
+  },
+  "scripts": {
+    "build": "pnpm build:viewer && pnpm build:node",
+    "build:node": "tsup",
+    "build:viewer": "vite build --config viewer/vite.config.ts",
+    "dev": "tsup --watch",
+    "dev:viewer": "vite --config viewer/vite.config.ts",
+    "typecheck": "tsc -p tsconfig.json && tsc -p viewer/tsconfig.json",
+    "prepublishOnly": "pnpm typecheck && pnpm build"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@vitejs/plugin-react": "^6.1.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.48.0",
+    "modern-screenshot": "^4.7.0",
+    "motion": "^13.4.4",
+    "playwright-core": "^1.63.0",
+    "postcss": "^8.5.28",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "sirv": "^3.0.2",
+    "tailwind-merge": "^3.7.0",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.3.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@fontsource/ibm-plex-sans": "^5.3.0",
+    "@radix-ui/react-dialog": "^1.1.23",
+    "@radix-ui/react-dropdown-menu": "^2.1.24",
+    "@radix-ui/react-popover": "^1.1.23",
+    "@radix-ui/react-tooltip": "^1.2.16",
+    "@tanstack/react-query": "^5.104.0",
+    "@types/node": "^24.13.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "marked": "^18.0.14",
+    "sugar-high": "^2.5.0",
+    "tsup": "^8.5.1",
+    "typescript": "^7.0.2",
+    "wouter": "^3.11.0"
+  }
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Design on a canvas"
+  short_description: "Live, clickable screens on a local design canvas"
+  default_prompt: "Use $designing-canvases to design these screens on a foss-design canvas and give me the preview link."

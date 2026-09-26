@@ -1,0 +1,21 @@
+{
+  "name": "foss-design",
+  "interface": {
+    "displayName": "Wiolett Industries"
+  },
+  "plugins": [
+    {
+      "name": "foss-design",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/wiolett-industries/foss-design.git",
+        "ref": "main"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

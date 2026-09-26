@@ -1,0 +1,4 @@
+interface:
+  display_name: "Build a design system"
+  short_description: "Tokens, components and guidelines in .design/system"
+  default_prompt: "Use $building-design-systems to extract this project's design system into .design/system and show it in the viewer."

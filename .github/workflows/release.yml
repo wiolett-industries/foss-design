@@ -1,0 +1,79 @@
+name: Release
+
+# Push a tag such as v0.2.0 (see "Releasing" in README.md). The whole release
+# check runs on the tag before anything is published.
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write # GitHub release
+  id-token: write # npm provenance and trusted publishing
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      # Trusted publishing (OIDC) needs npm 11.5.1 or newer.
+      - run: npm install -g npm@latest
+      - run: pnpm install --frozen-lockfile
+
+      - name: Tag matches every version
+        run: node scripts/versions.mjs "$GITHUB_REF_NAME"
+      - name: Lint
+        run: pnpm exec biome ci .
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Build
+        run: pnpm build
+
+      - name: Smoke test the packed CLI
+        run: |
+          set -euo pipefail
+          (cd packages/design && npm pack --pack-destination "$RUNNER_TEMP")
+          tarball=$(ls "$RUNNER_TEMP"/foss-design-*.tgz)
+          mkdir "$RUNNER_TEMP/smoke" && cd "$RUNNER_TEMP/smoke"
+          design() { npx -y --package="$tarball" foss-design "$@"; }
+          design --version
+          design init --name smoke
+          design system init
+          design new smoke
+          design check --render
+          design shot smoke
+          design build --tar
+          design stop
+
+      - name: Publish to npm
+        working-directory: packages/design
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if npm view "foss-design@$version" version >/dev/null 2>&1; then
+            echo "foss-design@$version is already on npm; nothing to publish."
+            exit 0
+          fi
+          # Pre-releases (0.2.0-beta.1) go to the "next" dist-tag, not "latest".
+          if [[ "$version" == *-* ]]; then tag=next; else tag=latest; fi
+          npm publish --provenance --access public --tag "$tag" --ignore-scripts
+        env:
+          # Not needed once trusted publishing is set up on npmjs.com for this workflow.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: GitHub release
+        run: |
+          flags=(--title "$GITHUB_REF_NAME" --generate-notes --verify-tag)
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then flags+=(--prerelease); fi
+          gh release create "$GITHUB_REF_NAME" "${flags[@]}" "$RUNNER_TEMP"/foss-design-*.tgz
+        env:
+          GH_TOKEN: ${{ github.token }}

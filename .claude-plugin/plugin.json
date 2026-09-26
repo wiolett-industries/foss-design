@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "foss-design",
+  "version": "0.1.0",
+  "description": "Design canvases and design systems on your machine: live, animated, clickable screens on an infinite canvas, kept in a gitignored .design folder and previewed locally. Two skills: designing-canvases and building-design-systems.",
+  "author": {
+    "name": "Wiolett Industries",
+    "url": "https://github.com/wiolett-industries"
+  },
+  "homepage": "https://github.com/wiolett-industries/foss-design",
+  "repository": "https://github.com/wiolett-industries/foss-design",
+  "license": "MIT",
+  "keywords": ["design", "canvas", "design-system", "prototype", "mockup", "tokens", "tailwind", "react"]
+}

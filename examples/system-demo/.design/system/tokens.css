@@ -1,0 +1,176 @@
+/*
+ * Harbor tokens. Light in :root, dark in :root[data-theme="dark"], Tailwind mapping in @theme inline.
+ */
+
+:root {
+  /* @group Surfaces */
+  /* Page background */
+  --bg: #f3f5f6;
+  /* Cards, panels, inputs */
+  --surface: #ffffff;
+  /* Hover fills, table stripes */
+  --soft: #eaeef0;
+  /* Raised popovers */
+  --raised: #ffffff;
+
+  /* @group Text */
+  /* Headings and body */
+  --ink: #102127;
+  /* Secondary copy */
+  --ink-2: #33474e;
+  /* Captions and meta */
+  --muted: #637680;
+
+  /* @group Lines */
+  --rule: #d9e1e4;
+  --rule-strong: #aebcc2;
+
+  /* @group Accent */
+  /* The one color that means "act here" */
+  --accent: #0f7c7a;
+  --accent-ink: #ffffff;
+  --accent-soft: #d8f0ee;
+
+  /* @group Status */
+  --ok: #1f7a4d;
+  --ok-soft: #e3f3ea;
+  --warn: #9a5b00;
+  --warn-soft: #fbeed6;
+  --danger: #c0352b;
+  --danger-soft: #fbe9e7;
+
+  /* @group Layout */
+  /* Sidebar width on desktop */
+  --sidebar-width: 264px;
+  --header-height: 56px;
+
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --bg: #0c1417;
+  --surface: #121c20;
+  --soft: #19252a;
+  --raised: #1d2a30;
+  --ink: #e4ecee;
+  --ink-2: #bccacf;
+  --muted: #7f949c;
+  --rule: #223036;
+  --rule-strong: #3b4d54;
+  --accent: #3cc4c0;
+  --accent-ink: #062322;
+  --accent-soft: #123634;
+  --ok: #5cc18d;
+  --ok-soft: #16301f;
+  --warn: #f0b252;
+  --warn-soft: #33260e;
+  --danger: #f07b70;
+  --danger-soft: #3a1c19;
+  color-scheme: dark;
+}
+
+@theme inline {
+  /* Interface text */
+  --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  /* IDs, numbers in tables, code */
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-soft: var(--soft);
+  --color-raised: var(--raised);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+
+  /* Table meta, badges */
+  --text-caption: 12px;
+  --text-caption--line-height: 16px;
+  /* Default reading size */
+  --text-body: 14px;
+  --text-body--line-height: 20px;
+  --text-lead: 16px;
+  --text-lead--line-height: 24px;
+  --text-title: 20px;
+  --text-title--line-height: 28px;
+  --text-display: 32px;
+  --text-display--line-height: 40px;
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --tracking-tight: -0.01em;
+  --leading-snug: 1.35;
+
+  --spacing: 4px;
+  /* Gutter between page columns */
+  --spacing-gutter: 24px;
+  /* Page side padding */
+  --spacing-page: 2rem;
+
+  /* Buttons and inputs */
+  --radius-control: 6px;
+  /* Cards and panels */
+  --radius-card: 10px;
+  /* Pills and avatars */
+  --radius-pill: 999px;
+
+  /* Cards on hover */
+  --shadow-card: 0 1px 2px rgb(16 33 39 / 0.06), 0 4px 12px rgb(16 33 39 / 0.06);
+  /* Menus and popovers */
+  --shadow-pop: 0 12px 32px rgb(16 33 39 / 0.16);
+
+  --blur-glass: 12px;
+
+  --breakpoint-tablet: 48rem;
+  --breakpoint-desktop: 80rem;
+
+  /* Standard ease for entering elements */
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --animate-fade-in: fade-in 160ms var(--ease-out);
+  --animate-spin: spin 1s linear infinite;
+}
+
+:root {
+  /* @group Motion */
+  /* Hover, press */
+  --duration-fast: 120ms;
+  /* Panels, menus */
+  --duration-base: 200ms;
+  --duration-slow: 360ms;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@layer base {
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
+  }
+}
