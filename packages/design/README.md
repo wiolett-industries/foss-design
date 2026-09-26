@@ -21,7 +21,7 @@ Or install the `design` command globally: `npm i -g foss-design`.
 - **A design system.** `.design/system/` holds `tokens.css` (light and dark CSS variables mapped to Tailwind v4 utilities), components importable as `@system/components/…`, specimens, guidelines and assets. The viewer renders it as a style guide at `/system`.
 - **Batteries.** Every screen gets Tailwind v4 with the tokens, React, `motion`, `lucide-react`, `clsx` and `tailwind-merge`, even in projects without them; the project's own packages and `design.json` aliases work too. `import { go, useTheme, useScreen } from '@design/runtime'` links screens into prototypes.
 - **Checks for agents.** `design check --render` loads every screen in Chrome and reports errors; `design shot` writes PNGs an agent can look at.
-- **Sharing.** `design build --tar` produces a static site of the canvases and the system for any static host.
+- **Sharing.** `design build --tar` produces a static site of the canvases and the system for any static host, or [foss-design Cloud](https://fossdesign.dev) syncs `.design` between machines and people: `design login`, `design link`, `design push`, `design pull`.
 
 ## Commands
 
@@ -31,13 +31,16 @@ Or install the `design` command globally: `npm i -g foss-design`.
 | `system init [--name] [--empty]` | Scaffold `.design/system`. |
 | `new <canvas> [--title] [--empty]` | Scaffold a canvas. |
 | `preview [--open [path]] [--port] [--restart] [--foreground]` | Start or reuse the viewer and print its URL. |
-| `stop`, `status` | Stop the viewer; show its state and a project summary. |
+| `stop`, `status` | Stop the viewer; show its state, a project summary and the cloud state. |
 | `check [canvas…] [--render] [--json]` | Validate the project; `--render` also loads every screen in Chrome. |
 | `shot <canvas>[/<screen>] [--page] [--theme] [--out] [--overview]` | Screenshot screens or whole pages. |
 | `build [canvas…] [--out] [--tar]` | Static site. |
+| `login`, `logout` | Sign this machine in to foss-design Cloud (a link with the code in it). |
+| `link [<project>] [--new <name>]` | List cloud projects, or link `.design` to one. |
+| `push [canvas…] [--resolved <unit>]`, `pull [canvas…] [--theirs <unit>]` | Sync with the cloud; exit 2 on a conflict. |
 
 Requirements: Node.js 20.19+. `check --render` and `shot` need an installed Chrome, Chromium, Edge or Brave, or `DESIGN_CHROME` pointing at one.
 
-Formats, agent skills and plugins: https://github.com/wiolett-industries/foss-design
+Formats, agent skills and plugins: https://github.com/wiolett-industries/foss-design · Cloud: https://fossdesign.dev
 
 MIT © Wiolett Industries

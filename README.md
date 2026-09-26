@@ -8,8 +8,10 @@ foss-design replaces the design canvas and design system parts of Claude Artifac
 
 - **Live screens on an infinite canvas.** Every artboard is a real page, a React component or an HTML file, rendered in its own frame: animations, hover states, forms and navigation work. Pages, sections, notes, pan and zoom, a play mode, light and dark.
 - **A design system next to it.** Tokens become Tailwind v4 utilities in every screen, components are importable, and the viewer turns it all into a style guide: colors, typography, spacing and shape, motion, component specimens, guidelines, assets.
-- **Files, not uploads.** Everything is in a gitignored `.design/` folder. The viewer is a local dev server with hot reload; there is nothing to publish, no size limit, no capability flags. [foss-design Cloud](#cloud) is there when you want to share, and only then.
+- **Files, not uploads.** Everything is in a gitignored `.design/` folder. The viewer is a local dev server with hot reload; there is nothing to publish, no size limit, no capability flags.
 - **Any agent.** Two skills teach Claude Code, Codex and other Agent Skills clients the format and the workflow; the `design` CLI checks screens in Chrome and screenshots them so the agent can review its own work.
+
+Want to share it? [foss-design Cloud](https://fossdesign.dev) is optional: `design push` and `design pull` sync the `.design` folder, and teammates or a public link can open it in the browser. [More below](#cloud).
 
 ## Quick start
 
@@ -131,22 +133,13 @@ The complete formats are in the skills: [canvas.json](skills/designing-canvases/
 
 ## Cloud
 
-foss-design works without an account. [foss-design Cloud](https://fossdesign.dev) is an optional service on top of the same `.design` folder: push it from one checkout and pull it into another, share a project with people as editors or viewers, and publish a canvas behind a public link. Free, Lite and Extra plans differ in limits; see [fossdesign.dev](https://fossdesign.dev).
+[foss-design Cloud](https://fossdesign.dev) keeps a copy of the `.design` folder: push from one checkout and pull into another, invite editors and viewers, publish a canvas by link. Screens are built on your machine; a canvas changed on both sides lands in `.design/.cache/cloud/incoming/` to merge. Pulled screens run in your local viewer, so invite as editors only people you trust.
 
 ```bash
-design login                  # prints a link with the code in it; open it, confirm, the CLI is signed in
-design link --new "My app"    # or: design link  (lists your projects), design link <project-id>
-design push                   # builds the canvases that changed and uploads them
-design pull                   # in another checkout, after design link <project-id>
+design login               # prints a link with the code in it; open it and confirm
+design link --new "My app" # or design link <project-id>
+design push                # and design pull on another machine
 ```
-
-- **Units.** The design system (`design.json` and `system/`) and each canvas (`canvas/<id>/`) sync on their own, with their own revisions, so people editing different canvases never collide. A design system change pushes every active canvas with it, because screens are built against the system.
-- **Builds happen here.** `push` builds each unit locally and uploads the files, so screens that import project code through `alias` work in the cloud as they do in the viewer. The cloud never runs a build.
-- **Conflicts.** `push` stops with exit 2 when the cloud is ahead: run `pull`. A unit changed on both sides is left as it is here and the cloud version goes to `.design/.cache/cloud/incoming/<unit>/`. Merge by hand, then `design push --resolved <unit>`; `design pull --theirs <unit>` takes the cloud version instead.
-- **State.** The link lives in `.design/cloud.json` (gitignored with the rest of `.design`), the token in `~/.config/foss-design/credentials.json` (mode 0600; `%APPDATA%` on Windows). `FOSS_DESIGN_CLOUD` points the CLI at another server.
-- **Trust.** Pulled screens are code your collaborators wrote, and the local viewer lets screens read files in your repository. Invite as editors only people you trust. In the browser, cloud screens run on a separate domain (`*.fossdesignusercontent.com`) in sandboxed frames.
-
-The web app embeds this package's viewer through `foss-design/viewer` (see `packages/design/viewer/src/library.ts`), with its data coming from the cloud instead of the local server.
 
 ## Turn off Claude Artifacts
 
