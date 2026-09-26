@@ -51,6 +51,24 @@ export function isUnitKey(key: string): boolean {
   return id !== null && ID_PATTERN.test(id)
 }
 
+/**
+ * Keys that differ from another key only by case, mapped to that other key. On case-insensitive
+ * filesystems (macOS, Windows) such canvases share one folder, so syncing either would overwrite the other.
+ */
+export function caseClashes(keys: Iterable<string>): Map<string, string> {
+  const byLower = new Map<string, string>()
+  const clashes = new Map<string, string>()
+  for (const key of new Set(keys)) {
+    const other = byLower.get(key.toLowerCase())
+    if (other === undefined) byLower.set(key.toLowerCase(), key)
+    else {
+      clashes.set(key, other)
+      clashes.set(other, key)
+    }
+  }
+  return clashes
+}
+
 /** Where a unit's files live, and what its paths inside `incoming/` and archives are relative to. */
 export function unitRoot(paths: DesignPaths, key: string): string {
   const id = unitCanvasId(key)
@@ -85,6 +103,15 @@ export function hashFile(file: string): FileEntry {
   return { hash: hashBuffer(data), size: data.length }
 }
 
+const warnedLinks = new Set<string>()
+
+/** A link out of `.design` could upload anything on the machine (a key, a credentials file): skip it, once loudly. */
+function warnLink(rel: string) {
+  if (warnedLinks.has(rel)) return
+  warnedLinks.add(rel)
+  process.stderr.write(`warning: .design/${rel} links outside .design; it is not synced\n`)
+}
+
 /** Files under `dir`, relative to `base`, without dot-files and `node_modules`. */
 function walk(dir: string, base: string, out: Manifest) {
   let entries: fs.Dirent[]
@@ -99,11 +126,15 @@ function walk(dir: string, base: string, out: Manifest) {
     let isFile = entry.isFile()
     let isDir = entry.isDirectory()
     if (entry.isSymbolicLink()) {
-      // A linked file syncs as its content; linked folders are not followed.
-      try {
-        isFile = fs.statSync(full).isFile()
-      } catch {}
+      // A linked file syncs as its content when it points inside `.design`; linked folders are not followed.
       isDir = false
+      isFile = false
+      try {
+        const target = fs.realpathSync(full)
+        const root = fs.realpathSync(base)
+        if (target.startsWith(root + path.sep)) isFile = fs.statSync(target).isFile()
+        else warnLink(toPosix(path.relative(base, full)))
+      } catch {}
     }
     if (isDir) walk(full, base, out)
     else if (isFile) out[toPosix(path.relative(base, full))] = hashFile(full)

@@ -7,7 +7,16 @@ import { STATIC_URLS } from '../core/sources'
 import type { PushUnit, RemoteUnit } from './client'
 import { hashes, incomingDir, type UnitStatus, unitStatus, writeLink } from './state'
 import { byUnit, newReport, plural, type SyncContext, type SyncReport, type UnitReport, unique, unitArg } from './sync'
-import { buildManifest, buildUnit, type Manifest, SYSTEM_UNIT, scanLocal, unitBuildDir, unitCanvasId } from './units'
+import {
+  buildManifest,
+  buildUnit,
+  caseClashes,
+  type Manifest,
+  SYSTEM_UNIT,
+  scanLocal,
+  unitBuildDir,
+  unitCanvasId,
+} from './units'
 
 const megabytes = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(bytes < 10 * 1024 * 1024 ? 1 : 0)} MB`
 
@@ -35,6 +44,13 @@ export async function push(ctx: SyncContext, options: { units: string[]; resolve
 
   const scan = scanLocal(paths)
   const remote = await client.units(link.project)
+  const clashes = caseClashes([...scan.units.keys(), ...remote.keys()])
+  if (clashes.size) {
+    const pairs = [...clashes].filter(([a, b]) => a < b).map(([a, b]) => `${a} / ${b}`)
+    throw new CliError(
+      `These canvases differ only by letter case: ${pairs.join(', ')}. On macOS and Windows they share one folder; rename one of them.`,
+    )
+  }
 
   // --resolved: the merge is done, so the base moves to the head pull recorded. Saved only once the push lands.
   for (const key of resolved) {

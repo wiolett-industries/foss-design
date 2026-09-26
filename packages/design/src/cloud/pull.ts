@@ -6,7 +6,7 @@ import { type DesignPaths, isInside } from '../core/paths'
 import type { RemoteUnit } from './client'
 import { allUnitKeys, hashes, incomingDir, unitStatus, writeLink } from './state'
 import { byUnit, newReport, plural, type SyncContext, type SyncReport, type UnitReport, unique, unitArg } from './sync'
-import { isUnitPath, type Manifest, SYSTEM_UNIT, scanLocal, unitRelative, unitRoot } from './units'
+import { caseClashes, isUnitPath, type Manifest, SYSTEM_UNIT, scanLocal, unitRelative, unitRoot } from './units'
 
 const HASH = /^[0-9a-f]{64}$/
 
@@ -86,8 +86,19 @@ export async function pull(ctx: SyncContext, options: { units: string[]; theirs:
 
   const keys =
     selected.length || theirs.length ? unique([...selected, ...theirs]) : allUnitKeys(link, new Map(), remote)
+  const clashes = caseClashes([...remote.keys(), ...scan.units.keys(), ...Object.keys(link.units)])
   const plans: Plan[] = []
   for (const key of keys.sort(byUnit)) {
+    const clash = clashes.get(key)
+    if (clash !== undefined) {
+      // One folder on case-insensitive disks: writing either would silently replace the other.
+      report.units.push({
+        unit: key,
+        action: 'conflict',
+        message: `differs from ${clash} only by letter case; rename one of them before pulling`,
+      })
+      continue
+    }
     const unit = remote.get(key) ?? null
     const s = unitStatus(key, link, scan.units.get(key)?.manifest, remote)
     if (!unit && !link.units[key] && link.conflicts[key] === undefined) {

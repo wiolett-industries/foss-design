@@ -79,6 +79,18 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 const record = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
 const str = (value: unknown) => (typeof value === 'string' ? value : undefined)
+
+/**
+ * Text from the cloud that ends up in the terminal (names, titles, emails, messages). Collaborators
+ * control some of it, so control characters are dropped: no escape sequences reach the terminal.
+ */
+// biome-ignore lint/suspicious/noControlCharactersInRegex: matching control characters is the point
+const CONTROL = /[\u0000-\u001f\u007f-\u009f]/g
+export const plainText = (value: string) => value.replace(CONTROL, '')
+const text = (value: unknown) => {
+  const found = str(value)
+  return found === undefined ? undefined : plainText(found)
+}
 const num = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : undefined)
 const flag = (...values: unknown[]) => values.some((value) => value === true || (typeof value === 'string' && !!value))
 
@@ -90,7 +102,7 @@ function errorFor(host: string, status: number, body: unknown, retryAfter: strin
   const limit = str(data.limit) ?? (num(data.limit) !== undefined ? String(data.limit) : undefined)
   if (status === 401)
     return new CloudError(`Not signed in to ${host}, or the token was revoked. Run \`design login\`.`, status, code)
-  let message = str(data.message) ?? DEFAULT_MESSAGE[status] ?? `${host} answered ${status}`
+  let message = text(data.message) ?? DEFAULT_MESSAGE[status] ?? `${host} answered ${status}`
   if (code === 'account_banned') message = `Your account is banned: ${message}`
   if (limit) message += ` (limit: ${limit})`
   if (status === 429 && retryAfter) message += `; retry in ${retryAfter}s`
@@ -114,12 +126,12 @@ function parseManifest(value: unknown): Manifest {
 
 function parseProject(value: unknown, fallbackRole: string): RemoteProject | null {
   const data = record(value)
-  const id = str(data.id) ?? (num(data.id) !== undefined ? String(data.id) : undefined)
+  const id = text(data.id) ?? (num(data.id) !== undefined ? String(data.id) : undefined)
   if (!id) return null
   return {
     id,
-    name: str(data.name) ?? id,
-    role: str(data.role) ?? fallbackRole,
+    name: text(data.name) ?? id,
+    role: text(data.role) ?? fallbackRole,
     archived: flag(data.archived, data.archivedAt, data.archived_at),
     banned: flag(data.banned, data.bannedAt, data.banned_at),
   }
@@ -131,7 +143,7 @@ function parseUnit(value: unknown): RemoteUnit | null {
   if (!key || !isUnitKey(key)) return null
   return {
     key,
-    title: str(data.title) ?? key,
+    title: text(data.title) ?? key,
     headRev: num(data.headRev) ?? num(data.head_rev) ?? num(data.head) ?? 0,
     archived: flag(data.archived, data.archivedAt, data.archived_at),
     banned: flag(data.banned, data.bannedAt, data.banned_at),
@@ -229,14 +241,14 @@ export class CloudClient {
     const token = str(body.access_token)
     if (response.ok && token) return { token }
     const error = str(body.error)
-    if (error) return { error, message: str(body.message) ?? str(body.error_description) }
+    if (error) return { error, message: text(body.message) ?? text(body.error_description) }
     return this.fail(response)
   }
 
   async me(): Promise<Me> {
     const body = record(await this.request('GET', '/me'))
     const user = record(body.user ?? body)
-    return { email: str(user.email) ?? '', name: str(user.name) }
+    return { email: text(user.email) ?? '', name: text(user.name) }
   }
 
   async projects(): Promise<{ owned: RemoteProject[]; shared: RemoteProject[] }> {
