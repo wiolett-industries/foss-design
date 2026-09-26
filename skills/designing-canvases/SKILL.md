@@ -1,13 +1,13 @@
 ---
 name: designing-canvases
-description: Design UI on a local infinite canvas with foss-design - mockups, screens, user flows, clickable and animated prototypes, landing pages, dashboards, onboarding, empty states, design explorations and variations, "show me how X could look". Screens are real React (.tsx) or HTML pages in a gitignored .design folder, laid out in canvas.json and previewed in a local viewer with pages, pan/zoom and live frames. Use for any request that would otherwise become a Claude Artifact or a Claude Design canvas; Artifacts are not used here. Pair with building-design-systems when the project has no design system yet.
+description: Design UI on a local infinite canvas with foss-design - mockups, screens, user flows, clickable and animated prototypes, landing pages, dashboards, onboarding, empty states, design explorations and variations, "show me how X could look". Screens are real React (.tsx) or HTML pages in a gitignored .design folder, laid out in canvas.json and previewed in a local viewer with pages, pan/zoom and live frames. Use for any request that would otherwise become a Claude Artifact or a Claude Design canvas; Artifacts are not used here. Also pushes, pulls and shares canvases through foss-design Cloud when the user asks. Pair with building-design-systems when the project has no design system yet.
 ---
 
 # Designing Canvases
 
 foss-design keeps designs in the project, next to the code, in a gitignored `.design/` folder. A **canvas** is `.design/canvas/<id>/`: a `canvas.json` that lays out **pages** of **sections**, and the **screens** it points at. Every screen is a real page (a React component or an HTML file) rendered live in its own frame, so animations, hover states, forms and navigation all work. The local viewer shows the canvas with pan and zoom, page switching, notes, a play mode, and an inspector (`I`): the user clicks any element to see its box model, typography, colors and radii traced to design tokens, and its Tailwind classes — so use token utilities rather than raw values, and they will show up as tokens there.
 
-Nothing is published or uploaded: files on disk are the design, and the viewer is a local dev server with hot reload.
+Nothing is published or uploaded unless the user asks for foss-design Cloud (below): files on disk are the design, and the viewer is a local dev server with hot reload.
 
 ## Run the CLI
 

@@ -62,6 +62,8 @@ export default function SignUp({ error }: { error?: string }) {
 
 When screens import project components that style themselves with Tailwind classes, add their folders to `sources` in `.design/design.json` (`{ "sources": ["src/components"] }`) so those classes are generated.
 
+In foss-design Cloud, `design push` builds the screens on this machine and uploads the result, so aliased project components show in the cloud as they do locally. A collaborator who pulls the canvas needs the same repository to preview it locally.
+
 ## Styles
 
 Unless the canvas or the item sets `"system": false`, every screen gets:

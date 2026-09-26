@@ -8,7 +8,7 @@ foss-design replaces the design canvas and design system parts of Claude Artifac
 
 - **Live screens on an infinite canvas.** Every artboard is a real page, a React component or an HTML file, rendered in its own frame: animations, hover states, forms and navigation work. Pages, sections, notes, pan and zoom, a play mode, light and dark.
 - **A design system next to it.** Tokens become Tailwind v4 utilities in every screen, components are importable, and the viewer turns it all into a style guide: colors, typography, spacing and shape, motion, component specimens, guidelines, assets.
-- **Files, not uploads.** Everything is in a gitignored `.design/` folder. The viewer is a local dev server with hot reload; there is nothing to publish, no size limit, no capability flags.
+- **Files, not uploads.** Everything is in a gitignored `.design/` folder. The viewer is a local dev server with hot reload; there is nothing to publish, no size limit, no capability flags. [foss-design Cloud](#cloud) is there when you want to share, and only then.
 - **Any agent.** Two skills teach Claude Code, Codex and other Agent Skills clients the format and the workflow; the `design` CLI checks screens in Chrome and screenshots them so the agent can review its own work.
 
 ## Quick start
@@ -63,6 +63,7 @@ Requirements: Node.js 20.19 or newer. `check --render` and `shot` use an install
       screens/                 .tsx (default export) or .html
       assets/
   .cache/                      generated; safe to delete
+  cloud.json                   link to a foss-design Cloud project (`design link`); local state
 ```
 
 A minimal `canvas.json`:
