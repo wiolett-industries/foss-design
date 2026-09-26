@@ -5,6 +5,8 @@
  */
 import { Component, type ComponentType, type ReactNode, useSyncExternalStore } from 'react'
 import { createRoot } from 'react-dom/client'
+import type { ViewerMessage } from '../shared/types'
+import { FrameInspector } from './inspect'
 
 export { TypographySpecimen } from './typography'
 
@@ -208,14 +210,20 @@ export function boot() {
   booted = true
   applyTheme(theme)
 
+  let inspector: FrameInspector | null = null
   window.addEventListener('message', (event: MessageEvent) => {
-    const data = event.data as { source?: string; type?: string; theme?: Theme } | null
-    if (data?.source !== 'design-viewer') return
+    const data = event.data as ViewerMessage | null
+    if (data?.source !== 'design-viewer' || event.source !== window.parent) return
     if (data.type === 'canvas') canvasHost = true
-    if (data.type === 'theme' && data.theme && !config.theme) {
+    else if (data.type === 'theme' && data.theme && !config.theme) {
       applyTheme(data.theme)
       scheduleSnapshot()
-    }
+    } else if (data.type === 'inspect') {
+      inspector ??= new FrameInspector(post)
+      if (data.tokens) inspector.setTokens(data.tokens)
+      if (data.on) inspector.enable()
+      else inspector.disable()
+    } else if (data.type === 'inspect-select') inspector?.select(data.ref)
   })
 
   window.addEventListener(
@@ -241,6 +249,23 @@ export function boot() {
   window.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && !event.defaultPrevented) post({ type: 'keydown', code: 'Escape' })
   })
+  // Holding ⌘/Ctrl inspects in the viewer, which cannot see keys pressed in here.
+  const isModifier = (name: string) => name === 'Meta' || name === 'Control'
+  window.addEventListener(
+    'keydown',
+    (event) => {
+      if (isModifier(event.key) || event.metaKey || event.ctrlKey) post({ type: 'key', name: event.key, down: true })
+    },
+    true,
+  )
+  window.addEventListener(
+    'keyup',
+    (event) => {
+      if (isModifier(event.key)) post({ type: 'key', name: event.key, down: false })
+    },
+    true,
+  )
+  window.addEventListener('blur', () => post({ type: 'blur' }))
   window.addEventListener('error', (event) => recordError(event.message || 'Script error'))
   window.addEventListener('unhandledrejection', (event) => {
     const reason = event.reason as { message?: string } | undefined

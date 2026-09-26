@@ -118,8 +118,10 @@ The complete formats are in the skills: [canvas.json](skills/designing-canvases/
 
 - `/` lists canvases and the design system.
 - `/c/<canvas>` is the canvas: drag or scroll to pan, pinch or ⌘/Ctrl + scroll to zoom, ⇧1 to fit. Click a screen to interact with it, Esc to leave, Enter or double-click to play it full size.
+
+  Big canvases stay smooth: screens in view run live (up to 12, a few loading at a time once the camera rests), screens you passed sleep behind a snapshot and wake without reloading, and the rest show snapshots. The dev server loads frames from the viewer's twin host (`127.0.0.1` when the viewer is on `localhost`, and the other way round), so the browser runs them in their own process and they cannot stall panning; open the viewer on either of the two for that. Zooming out stops at half of the fit-to-page zoom.
 - `/c/<canvas>/play/<screen>` shows one screen with previous and next.
-- **Inspect** (the button in the top bar, or `I`) on the canvas and in play: hover a screen to see margin, padding and content, click an element for the right-hand panel — the React component that rendered it and its file, box model, layout, typography, colors, radius and shadow traced back to design tokens, Tailwind classes, attributes, children — and copy its CSS. Clicks go to the inspector, not the screen.
+- **Inspect** (the button in the top bar, or `I`) on the canvas and in play: hover a screen to see margin, padding and content, click an element for the right-hand panel — the React component that rendered it and its file, box model, layout, typography, colors, radius and shadow traced back to design tokens, Tailwind classes, attributes, children — and copy its CSS. Clicks go to the inspector, not the screen. Hold ⌘/Ctrl to highlight without switching Inspect on; click while holding to pick.
 - `/system` is the style guide.
 
 ## Turn off Claude Artifacts

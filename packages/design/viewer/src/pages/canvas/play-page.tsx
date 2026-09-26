@@ -6,7 +6,7 @@ import { SlidePanel } from '../../components/slide-panel'
 import { ThemeMenu } from '../../components/theme-menu'
 import { Bar } from '../../components/topbar'
 import { useCanvas } from '../../lib/api'
-import { absoluteUrl, frameSrc, listenToFrame, sendTheme } from '../../lib/frames'
+import { absoluteUrl, frameSrc, listenToFrame, reloadFrame, sendTheme } from '../../lib/frames'
 import { useTheme } from '../../lib/theme'
 import { IconButton } from '../../ui/button'
 import { Segmented } from '../../ui/choice'
@@ -118,7 +118,7 @@ function Player({ canvas, itemId }: { canvas: CanvasDoc; itemId: string }) {
   const inspection = useInspection(frames, inspect, {
     onEscape: () => setInspect(false),
   })
-  const picked = inspection.info?.el
+  const picked = !!inspection.info
   useEffect(() => {
     if (picked) setInspect(true)
   }, [picked])
@@ -213,15 +213,7 @@ function Player({ canvas, itemId }: { canvas: CanvasDoc; itemId: string }) {
             />
           ) : null}
           {item.kind === 'screen' ? <InspectToggle on={inspectOn} onChange={setInspect} /> : null}
-          <IconButton
-            icon="refresh"
-            label="Reload"
-            onClick={() => {
-              try {
-                frame.current?.contentWindow?.location.reload()
-              } catch {}
-            }}
-          />
+          <IconButton icon="refresh" label="Reload" onClick={() => reloadFrame(frame.current)} />
           <a
             href={openUrl}
             target="_blank"

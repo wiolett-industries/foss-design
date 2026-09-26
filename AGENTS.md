@@ -8,7 +8,7 @@ This repository holds foss-design: the `foss-design` npm package (CLI, preview s
 | --- | --- | --- |
 | Formats | `packages/design/src/core/` | `schema.ts` (design.json, system.json, canvas.json), `canvas.ts`, `system.ts`, `tokens.ts` (token parsing), `project.ts`. |
 | Server | `packages/design/src/server/` | Vite in middleware mode, generated frame entries, shipped-package links, API, events, snapshots. |
-| Runtime | `packages/design/src/runtime/` | Code injected into every frame: theme, size reporting, `go()`, errors, snapshots. Built to `dist/runtime`. |
+| Runtime | `packages/design/src/runtime/` | Code injected into every frame: theme, size reporting, `go()`, errors, snapshots, the inspector. Frames may sit on another origin than the viewer (see `viewer/src/lib/frames.ts`), so the viewer talks to them only through postMessage. Built to `dist/runtime`. |
 | CLI | `packages/design/src/cli/` | Commands; `index.ts` holds the help text, which is the CLI contract. |
 | Capture | `packages/design/src/capture/` | Chrome launching and frame loading for `check --render` and `shot`. |
 | Viewer | `packages/design/viewer/` | The React app served at `/`, built to `dist/viewer`. |

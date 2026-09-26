@@ -1,65 +1,31 @@
-import type { Token } from '@shared/types'
+import type { Box, ColorValue, Crumb, ElementInfo, Token } from '../shared/types'
 
 /**
- * Element inspection inside a frame. Frames are served from the viewer's own
- * origin, so the viewer reads their DOM directly; nothing runs in the screen.
+ * Element inspection, run inside the frame so it works whatever origin the
+ * frame is served from. The viewer turns it on and gets back plain data.
  */
 
-export type Box = [top: number, right: number, bottom: number, left: number]
+type Post = (message: Record<string, unknown>) => void
 
-export interface Crumb {
-  el: Element
-  label: string
-}
+// Elements go out as numbers: the viewer names them back to pick a parent or a child.
+let nextRef = 1
+const refs = new Map<number, WeakRef<Element>>()
+const refIds = new WeakMap<Element, number>()
 
-export interface ColorValue {
-  /** Readable: hex when the color is sRGB. */
-  value: string
-  /** As computed, for painting a swatch. */
-  css: string
-  token?: string
-}
-
-export interface ElementInfo {
-  el: Element
-  tag: string
-  label: string
-  text?: string
-  classes: string[]
-  attributes: [string, string][]
-  component?: { owners: string[]; file?: string }
-  rect: { x: number; y: number; w: number; h: number }
-  margin: Box
-  border: Box
-  padding: Box
-  layout: [string, string][]
-  typography?: {
-    family: string
-    familyToken?: string
-    size: string
-    sizeToken?: string
-    weight: string
-    lineHeight: string
-    letterSpacing: string
-    color: ColorValue
-    align: string
-    transform?: string
+function refOf(el: Element): number {
+  let id = refIds.get(el)
+  if (id === undefined) {
+    id = nextRef++
+    refIds.set(el, id)
+    refs.set(id, new WeakRef(el))
+    if (refs.size > 4000) for (const [key, ref] of refs) if (!ref.deref()?.isConnected) refs.delete(key)
   }
-  appearance: {
-    background?: ColorValue
-    backgroundImage?: string
-    border?: { width: string; style: string; color: ColorValue }
-    radius?: { value: string; token?: string }
-    shadow?: { value: string; token?: string }
-    opacity?: string
-  }
-  path: Crumb[]
-  children: Crumb[]
+  return id
 }
 
 const OVERLAY_TAG = 'design-inspect'
 
-export function isOverlay(el: Element | null): boolean {
+function isOverlay(el: Element | null): boolean {
   return !!el && el.tagName.toLowerCase() === OVERLAY_TAG
 }
 
@@ -72,7 +38,7 @@ function round(value: number): number {
 }
 
 /** `div.flex.gap-2` — tag with an id or the first classes. */
-export function shortLabel(el: Element): string {
+function shortLabel(el: Element): string {
   const tag = el.tagName.toLowerCase()
   if (el.id) return `${tag}#${el.id}`
   const classes = classList(el).slice(0, 2)
@@ -98,7 +64,7 @@ function isTransparent(color: string): boolean {
 }
 
 /** Token values as the frame computes them, so a computed style can be traced back to its token. */
-export class TokenIndex {
+class TokenIndex {
   private maps = new Map<string, Map<string, { name: string; utility?: string }[]>>()
 
   constructor(doc: Document, tokens: Token[]) {
@@ -231,7 +197,7 @@ const LAYOUT_KEYS: [string, string][] = [
   ['z-index', 'Z-index'],
 ]
 
-export function describe(el: Element, tokens: TokenIndex | null): ElementInfo {
+function describe(el: Element, tokens: TokenIndex | null): ElementInfo {
   const view = el.ownerDocument.defaultView!
   const style = view.getComputedStyle(el)
   const rect = el.getBoundingClientRect()
@@ -276,11 +242,11 @@ export function describe(el: Element, tokens: TokenIndex | null): ElementInfo {
   const path: Crumb[] = []
   for (let node = el.parentElement; node && node !== el.ownerDocument.documentElement; node = node.parentElement) {
     if (node.id === 'root' || node === el.ownerDocument.body) break
-    path.unshift({ el: node, label: shortLabel(node) })
+    path.unshift({ ref: refOf(node), label: shortLabel(node) })
   }
 
   return {
-    el,
+    ref: refOf(el),
     tag: el.tagName.toLowerCase(),
     label: shortLabel(el),
     text: hasOwnText(el) ? (el.textContent ?? '').trim().replace(/\s+/g, ' ').slice(0, 120) : undefined,
@@ -328,13 +294,14 @@ export function describe(el: Element, tokens: TokenIndex | null): ElementInfo {
     children: Array.from(el.children)
       .filter((child) => !isOverlay(child) && !['SCRIPT', 'STYLE'].includes(child.tagName))
       .slice(0, 40)
-      .map((child) => ({ el: child, label: shortLabel(child) })),
+      .map((child) => ({ ref: refOf(child), label: shortLabel(child) })),
+    css: cssText(el),
   }
 }
 
 /** CSS worth copying for an element, as a block. */
-export function cssText(info: ElementInfo): string {
-  const style = info.el.ownerDocument.defaultView!.getComputedStyle(info.el)
+function cssText(el: Element): string {
+  const style = getComputedStyle(el)
   const keys = [
     'display',
     'flex-direction',
@@ -365,7 +332,7 @@ export function cssText(info: ElementInfo): string {
         value && !['normal', 'none', '0px', 'auto'].includes(value) && !(key === 'opacity' && value === '1'),
     )
     .map(([key, value]) => `  ${key}: ${value};`)
-  return `${info.label} {\n${lines.join('\n')}\n}`
+  return `${shortLabel(el)} {\n${lines.join('\n')}\n}`
 }
 
 const OVERLAY_CSS = `
@@ -455,104 +422,137 @@ class Overlay {
   }
 }
 
-export interface InspectorHandle {
-  /** Outline `el` in this frame; `notify: false` changes only the outline. */
-  select(el: Element | null, notify?: boolean): void
-  detach(): void
-}
-
 /**
- * Take over pointer input in a frame: hovering highlights, clicking selects
- * (the screen does not see the click), Escape clears the selection.
+ * Inspect mode: hovering highlights, clicking picks (the screen does not see
+ * the click), Escape clears the pick. The pick outlives the mode, so the
+ * viewer's panel stays current until it clears it.
  */
-export function attachInspector(
-  frame: HTMLIFrameElement,
-  handlers: { onSelect(el: Element | null): void; onEscape(): void },
-): InspectorHandle | null {
-  let doc: Document | null = null
-  try {
-    doc = frame.contentDocument
-  } catch {
-    return null
-  }
-  if (!doc?.documentElement) return null
-  const overlay = new Overlay(doc)
-  let hovered: Element | null = null
-  let selected: Element | null = null
-  let frameId = 0
+export class FrameInspector {
+  private overlay: Overlay | null = null
+  private hovered: Element | null = null
+  private selected: Element | null = null
+  private tokens: Token[] = []
+  private index: { theme: string | undefined; index: TokenIndex } | null = null
+  private frame = 0
+  private refresh: ReturnType<typeof setInterval> | undefined
+  private last = ''
 
-  const valid = (el: EventTarget | null): Element | null => {
-    const node = el as Element | null
+  constructor(private post: Post) {}
+
+  setTokens(tokens: Token[]) {
+    this.tokens = tokens
+    this.index = null
+  }
+
+  enable() {
+    if (this.overlay) return
+    this.overlay = new Overlay(document)
+    const opts = { capture: true }
+    document.addEventListener('pointermove', this.onMove, opts)
+    document.addEventListener('mouseout', this.onLeave, opts)
+    for (const type of SWALLOWED) document.addEventListener(type, this.swallow, opts)
+    document.addEventListener('click', this.onClick, opts)
+    document.addEventListener('contextmenu', this.onContextMenu, opts)
+    document.addEventListener('keydown', this.onKey, opts)
+    document.documentElement.style.setProperty('cursor', 'crosshair', 'important')
+    const tick = () => {
+      this.overlay?.hover(this.hovered && this.hovered !== this.selected ? this.hovered : null)
+      this.overlay?.select(this.selected)
+      this.frame = requestAnimationFrame(tick)
+    }
+    this.frame = requestAnimationFrame(tick)
+  }
+
+  disable() {
+    if (!this.overlay) return
+    cancelAnimationFrame(this.frame)
+    const opts = { capture: true }
+    document.removeEventListener('pointermove', this.onMove, opts)
+    document.removeEventListener('mouseout', this.onLeave, opts)
+    for (const type of SWALLOWED) document.removeEventListener(type, this.swallow, opts)
+    document.removeEventListener('click', this.onClick, opts)
+    document.removeEventListener('contextmenu', this.onContextMenu, opts)
+    document.removeEventListener('keydown', this.onKey, opts)
+    document.documentElement.style.removeProperty('cursor')
+    this.overlay.destroy()
+    this.overlay = null
+    this.hovered = null
+  }
+
+  /** Pick the element behind `ref` and report it, or clear the pick quietly. */
+  select(ref: number | null) {
+    const el = ref === null ? null : (refs.get(ref)?.deref() ?? null)
+    this.pick(el, ref !== null)
+  }
+
+  private pick(el: Element | null, report = true) {
+    this.selected = el
+    this.last = ''
+    clearInterval(this.refresh)
+    // Styles move with state, hover and hot updates: keep the report fresh.
+    if (el) this.refresh = setInterval(() => this.report(), 700)
+    if (report) this.report()
+  }
+
+  private report() {
+    const el = this.selected
+    if (el && !el.isConnected) {
+      this.pick(null, false)
+      this.post({ type: 'inspect', info: null })
+      return
+    }
+    const info = el ? describe(el, this.tokenIndex()) : null
+    const text = JSON.stringify(info)
+    if (text === this.last) return
+    this.last = text
+    this.post({ type: 'inspect', info })
+  }
+
+  private tokenIndex(): TokenIndex | null {
+    if (!this.tokens.length) return null
+    const theme = document.documentElement.dataset.theme
+    // Token values differ per theme: rebuild the index when the theme changes.
+    if (!this.index || this.index.theme !== theme) this.index = { theme, index: new TokenIndex(document, this.tokens) }
+    return this.index.index
+  }
+
+  private valid(target: EventTarget | null): Element | null {
+    const node = target as Element | null
     if (node?.nodeType !== 1 || isOverlay(node)) return null
-    if (node === doc!.documentElement || node === doc!.body) return null
+    if (node === document.documentElement || node === document.body) return null
     return node
   }
 
-  const tick = () => {
-    if (selected && !selected.isConnected) {
-      selected = null
-      handlers.onSelect(null)
-    }
-    overlay.hover(hovered && hovered !== selected ? hovered : null)
-    overlay.select(selected)
-    frameId = frame.contentWindow!.requestAnimationFrame(tick)
-  }
-  frameId = frame.contentWindow!.requestAnimationFrame(tick)
-
-  const setSelected = (el: Element | null, notify = true) => {
-    selected = el
-    if (notify) handlers.onSelect(el)
+  private onMove = (event: Event) => {
+    this.hovered = this.valid(event.target)
   }
 
-  const onMove = (event: Event) => {
-    hovered = valid((event as PointerEvent).target)
+  private onLeave = (event: Event) => {
+    if (!(event as MouseEvent).relatedTarget) this.hovered = null
   }
-  const onLeave = (event: Event) => {
-    if (!(event as MouseEvent).relatedTarget) hovered = null
-  }
-  const swallow = (event: Event) => {
+
+  private swallow = (event: Event) => {
     event.preventDefault()
     event.stopImmediatePropagation()
   }
-  const onClick = (event: Event) => {
-    swallow(event)
-    setSelected(valid(event.target))
+
+  private onClick = (event: Event) => {
+    this.swallow(event)
+    this.pick(this.valid(event.target))
   }
+
   // macOS turns Ctrl+click into a context menu, with no click: treat it as one.
-  const onContextMenu = (event: Event) => {
-    swallow(event)
-    if ((event as MouseEvent).ctrlKey) setSelected(valid(event.target))
+  private onContextMenu = (event: Event) => {
+    this.swallow(event)
+    if ((event as MouseEvent).ctrlKey) this.pick(this.valid(event.target))
   }
-  const onKey = (event: KeyboardEvent) => {
+
+  private onKey = (event: KeyboardEvent) => {
     if (event.key !== 'Escape') return
     event.stopImmediatePropagation()
-    if (selected) setSelected(null)
-    else handlers.onEscape()
-  }
-
-  const opts = { capture: true }
-  doc.addEventListener('pointermove', onMove, opts)
-  doc.addEventListener('mouseout', onLeave, opts)
-  for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'dblclick', 'submit'])
-    doc.addEventListener(type, swallow, opts)
-  doc.addEventListener('click', onClick, opts)
-  doc.addEventListener('contextmenu', onContextMenu, opts)
-  doc.addEventListener('keydown', onKey, opts)
-  doc.documentElement.style.setProperty('cursor', 'crosshair', 'important')
-
-  return {
-    select: setSelected,
-    detach() {
-      frame.contentWindow?.cancelAnimationFrame(frameId)
-      doc!.removeEventListener('pointermove', onMove, opts)
-      doc!.removeEventListener('mouseout', onLeave, opts)
-      for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'dblclick', 'submit'])
-        doc!.removeEventListener(type, swallow, opts)
-      doc!.removeEventListener('click', onClick, opts)
-      doc!.removeEventListener('contextmenu', onContextMenu, opts)
-      doc!.removeEventListener('keydown', onKey, opts)
-      doc!.documentElement.style.removeProperty('cursor')
-      overlay.destroy()
-    },
+    if (this.selected) this.pick(null)
+    else this.post({ type: 'inspect-escape' })
   }
 }
+
+const SWALLOWED = ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'dblclick', 'submit']

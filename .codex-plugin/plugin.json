@@ -1,6 +1,6 @@
 {
   "name": "foss-design",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Design canvases and design systems on your machine: live, animated, clickable screens on an infinite canvas, kept in a gitignored .design folder and previewed locally. Two skills: designing-canvases and building-design-systems.",
   "author": {
     "name": "Wiolett Industries",

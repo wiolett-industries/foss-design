@@ -37,6 +37,8 @@
   --grid-dot: #c9ced5;
   --note: #fdf3e3;
   --note-line: #edd6b1;
+  --scrollbar: #c3c9d0;
+  --scrollbar-hover: #9aa2ac;
   color-scheme: light;
 }
 
@@ -69,6 +71,8 @@
   --grid-dot: #30343a;
   --note: #2a2415;
   --note-line: #574420;
+  --scrollbar: #3a3f46;
+  --scrollbar-hover: #565d66;
   color-scheme: dark;
 }
 
@@ -145,6 +149,44 @@
 
   ::selection {
     background: var(--action-soft);
+  }
+
+  /*
+   * The viewer's own scrollbars: a thin rounded thumb on a clear track. Screens are separate
+   * documents in frames and keep theirs. Chrome ignores ::-webkit-scrollbar once scrollbar-color
+   * is set, so the standard properties go only to browsers without it (Firefox).
+   */
+  @supports selector(::-webkit-scrollbar) {
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+
+    ::-webkit-scrollbar-track,
+    ::-webkit-scrollbar-corner {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      border: 3px solid transparent;
+      border-radius: 999px;
+      background: var(--scrollbar) padding-box;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background-color: var(--scrollbar-hover);
+    }
+
+    ::-webkit-scrollbar-button {
+      display: none;
+    }
+  }
+
+  @supports not selector(::-webkit-scrollbar) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--scrollbar) transparent;
+    }
   }
 }
 
@@ -398,6 +440,19 @@
 .canvas-dots {
   background-color: var(--bg);
   background-image: radial-gradient(circle, var(--grid-dot) 1px, transparent 1.2px);
+}
+
+.canvas-root {
+  background-color: var(--bg);
+}
+
+/* The dot grid pans as a layer of its own: moving it costs no repaint. */
+.canvas-grid {
+  position: absolute;
+  inset: -96px;
+  pointer-events: none;
+  background-image: radial-gradient(circle, var(--grid-dot) 1px, transparent 1.2px);
+  will-change: transform;
 }
 
 .canvas-world {

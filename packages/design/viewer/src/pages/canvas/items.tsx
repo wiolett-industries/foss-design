@@ -7,6 +7,7 @@ import { useStore } from '../../lib/store'
 import { Icon } from '../../ui/icon'
 import type { Placed } from './layout'
 import { setFrame, setFrameEl, setSize, type ViewStore } from './view-state'
+import type { FrameMode } from './viewport'
 
 export interface FrameEvents {
   onGo(from: string, target: string): void
@@ -36,14 +37,14 @@ function deviceIcon(width: number) {
 /** A screen or an external page on the canvas: live frame, snapshot or placeholder. */
 export const FrameItem = memo(function FrameItem({
   placed,
-  live,
+  mode,
   theme,
   store,
   events,
   capture,
 }: {
   placed: Placed & { item: ScreenItem | UrlItem }
-  live: boolean
+  mode: FrameMode
   theme: Theme
   store: ViewStore
   events: FrameEvents
@@ -68,15 +69,17 @@ export const FrameItem = memo(function FrameItem({
   const [openTheme] = useState(frameTheme)
   const src = item.kind === 'screen' ? frameSrc(item.url, openTheme, capture ? { capture: '1' } : undefined) : item.url
   const ready = !!status?.ready
+  const off = mode === 'off'
+  const mounted = !off && !(item.kind === 'screen' && item.missing)
 
   useEffect(() => {
-    if (!live) setFrame(store, item.id, { ready: false })
-  }, [live, store, item.id])
+    if (off) setFrame(store, item.id, { ready: false })
+  }, [off, store, item.id])
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: re-attach when the iframe remounts for a new source
   useEffect(() => {
     const frame = ref.current
-    if (!frame || !live || item.kind !== 'screen') return
+    if (!frame || off || item.kind !== 'screen') return
     return listenToFrame(frame, (message: RuntimeMessage) => {
       switch (message.type) {
         case 'ready':
@@ -105,7 +108,7 @@ export const FrameItem = memo(function FrameItem({
           break
       }
     })
-  }, [live, item.id, item.kind, auto, store, events, src, rev])
+  }, [off, item.id, item.kind, auto, store, events, src, rev])
 
   useEffect(() => {
     if (item.kind === 'screen') sendTheme(ref.current, frameTheme)
@@ -115,6 +118,9 @@ export const FrameItem = memo(function FrameItem({
     item.kind === 'screen'
       ? (item.snapshots?.[frameTheme] ?? item.snapshots?.[frameTheme === 'dark' ? 'light' : 'dark'])
       : undefined
+  // Asleep: still mounted, so it keeps its state, but hidden behind its snapshot and skipped by
+  // rendering, which also stops its animations. Without a snapshot it stays in view as it is.
+  const asleep = mode === 'asleep' && ready && !!snapshot
 
   return (
     <div
@@ -122,37 +128,39 @@ export const FrameItem = memo(function FrameItem({
       className="absolute overflow-hidden bg-surface"
       style={{ left: x, top: y, width: w, height: h, boxShadow: 'var(--shadow-frame), 0 0 0 1px var(--rule)' }}
     >
-      {!ready && snapshot ? (
+      {(!ready || asleep) && snapshot ? (
         <img
           src={snapshot}
           alt=""
           draggable={false}
+          loading="lazy"
+          decoding="async"
           className="absolute inset-0 h-full w-full object-cover object-top select-none"
         />
       ) : null}
-      {!ready && !snapshot ? (
-        <Placeholder item={item} loading={live && !(item.kind === 'screen' && item.missing)} />
-      ) : null}
-      {live && !(item.kind === 'screen' && item.missing) ? (
-        <iframe
-          ref={setRef}
-          key={rev}
-          src={src}
-          title={item.title}
-          allow="clipboard-read; clipboard-write; fullscreen"
-          className={cn(
-            'absolute top-0 left-0 block border-0 transition-opacity duration-200',
-            ready ? 'opacity-100' : 'opacity-0',
-          )}
-          style={{ width: w, height: h, colorScheme: frameTheme }}
-          onLoad={() => {
-            if (item.kind === 'url') setFrame(store, item.id, { ready: true })
-            else {
-              sendTheme(ref.current, frameTheme)
-              claimWheel(ref.current)
-            }
-          }}
-        />
+      {!ready && !snapshot ? <Placeholder item={item} loading={mounted} /> : null}
+      {mounted ? (
+        <div className="absolute inset-0" style={{ contentVisibility: asleep ? 'hidden' : 'visible' }}>
+          <iframe
+            ref={setRef}
+            key={rev}
+            src={src}
+            title={item.title}
+            allow="clipboard-read; clipboard-write; fullscreen"
+            className={cn(
+              'absolute top-0 left-0 block border-0 transition-opacity duration-200',
+              ready ? 'opacity-100' : 'opacity-0',
+            )}
+            style={{ width: w, height: h, colorScheme: frameTheme }}
+            onLoad={() => {
+              if (item.kind === 'url') setFrame(store, item.id, { ready: true })
+              else {
+                sendTheme(ref.current, frameTheme)
+                claimWheel(ref.current)
+              }
+            }}
+          />
+        </div>
       ) : null}
       {active || inspecting ? null : <div data-shield={item.id} className="absolute inset-0" />}
     </div>

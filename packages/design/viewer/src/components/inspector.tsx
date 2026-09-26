@@ -1,107 +1,87 @@
-import type { Token } from '@shared/types'
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
+import type { Box, ColorValue, ElementInfo, RuntimeMessage, Token } from '@shared/types'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { useProject, useSystem } from '../lib/api'
 import { cn } from '../lib/cn'
 import { copyText } from '../lib/copy'
-import {
-  attachInspector,
-  type Box,
-  type ColorValue,
-  cssText,
-  describe,
-  type ElementInfo,
-  type InspectorHandle,
-  TokenIndex,
-} from '../lib/inspect'
+import { listenToFrame, sendToFrame } from '../lib/frames'
 import { MOD_KEY } from '../lib/platform'
 import { Button, IconButton } from '../ui/button'
 import { Icon } from '../ui/icon'
 import { Kbd } from '../ui/text'
 
 interface Selection {
-  el: Element
+  info: ElementInfo
   frame: HTMLIFrameElement
 }
 
 /**
  * Inspect frames: while `enabled`, every frame in `frames` highlights on hover
- * and selects on click. The selection outlives `enabled` (so a quick ⌘-hold
- * leaves the panel open) until it is cleared.
+ * and picks on click. The inspecting runs inside each frame (see the runtime's
+ * inspect.ts); this side only switches it and shows what the frames report.
+ * The pick outlives `enabled` (so a quick ⌘-hold leaves the panel open) until
+ * it is cleared.
  */
 export function useInspection(frames: HTMLIFrameElement[], enabled: boolean, options: { onEscape(): void }) {
   const project = useProject().data
-  const tokens = useSystem(!!project?.system).data?.tokens
+  const tokens = useSystem(!!project?.system).data?.tokens as Token[] | undefined
   const [selected, setSelected] = useState<Selection | null>(null)
-  const [tick, setTick] = useState(0)
-  const handles = useRef(new Map<HTMLIFrameElement, InspectorHandle>())
-  const selectedRef = useRef<Selection | null>(null)
-  selectedRef.current = selected
+  const state = useRef({ enabled, tokens })
+  state.current = { enabled, tokens }
   const onEscape = useRef(options.onEscape)
   onEscape.current = options.onEscape
+  const framesRef = useRef(frames)
+  framesRef.current = frames
+  // What each frame was last told, so a new frame going live does not restart the others.
+  const told = useRef(new Map<HTMLIFrameElement, { on: boolean; tokens?: Token[] }>())
 
+  const tell = (frame: HTMLIFrameElement, force = false) => {
+    const { enabled: on, tokens: list } = state.current
+    const last = told.current.get(frame)
+    if (!force && last?.on === on && last.tokens === list) return
+    told.current.set(frame, { on, tokens: list })
+    sendToFrame(frame, { type: 'inspect', on, tokens: on ? (list ?? []) : undefined })
+  }
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: tell reads the latest state through a ref
   useEffect(() => {
-    if (!enabled) return
-    const map = handles.current
-    const cleanups: (() => void)[] = []
-    for (const frame of frames) {
-      const attach = () => {
-        map.get(frame)?.detach()
-        const handle = attachInspector(frame, {
-          onSelect: (el) => {
-            // One outline across all frames: clear the others.
-            for (const [other, h] of map) if (other !== frame) h.select(null, false)
-            setSelected(el ? { el, frame } : null)
-          },
-          onEscape: () => onEscape.current(),
-        })
-        if (!handle) {
-          map.delete(frame)
-          return
-        }
-        map.set(frame, handle)
-        const current = selectedRef.current
-        if (current?.frame === frame && current.el.isConnected) handle.select(current.el, false)
-      }
-      attach()
-      frame.addEventListener('load', attach)
-      cleanups.push(() => {
-        frame.removeEventListener('load', attach)
-        map.get(frame)?.detach()
-        map.delete(frame)
-      })
-    }
+    for (const frame of frames) tell(frame)
+    for (const frame of told.current.keys()) if (!frames.includes(frame)) told.current.delete(frame)
+  }, [frames, enabled, tokens])
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: tell reads the latest state through a ref
+  useEffect(() => {
+    const offs = frames.map((frame) =>
+      listenToFrame(frame, (message: RuntimeMessage) => {
+        // A frame that (re)loaded starts with inspecting off.
+        if (message.type === 'ready') {
+          if (state.current.enabled) tell(frame, true)
+          else told.current.set(frame, { on: false })
+        } else if (message.type === 'inspect') {
+          if (message.info) {
+            // One pick across all frames: clear the others.
+            for (const other of framesRef.current)
+              if (other !== frame) sendToFrame(other, { type: 'inspect-select', ref: null })
+            setSelected({ info: message.info, frame })
+          } else setSelected((current) => (current?.frame === frame ? null : current))
+        } else if (message.type === 'inspect-escape') onEscape.current()
+      }),
+    )
     return () => {
-      for (const cleanup of cleanups) cleanup()
+      for (const off of offs) off()
     }
-  }, [frames, enabled])
+  }, [frames])
 
-  // Styles move with state, hover and hot updates: keep the description fresh.
-  useEffect(() => {
-    if (!selected) return
-    const timer = setInterval(() => setTick((n) => n + 1), 700)
-    return () => clearInterval(timer)
-  }, [selected])
-
-  const info = useMemo(() => {
-    void tick
-    if (!selected?.el.isConnected) return null
-    const doc = selected.el.ownerDocument
-    const index = tokens?.length ? new TokenIndex(doc, tokens as Token[]) : null
-    return describe(selected.el, index)
-  }, [selected, tokens, tick])
-
+  // A frame that left (scrolled away, unmounted) takes its pick with it.
+  const frame = selected && frames.includes(selected.frame) ? selected.frame : null
   return {
-    info,
-    frame: info ? (selected?.frame ?? null) : null,
-    select(el: Element | null) {
-      const frame = selectedRef.current?.frame
-      if (!el || !frame) {
-        for (const handle of handles.current.values()) handle.select(null, false)
+    info: frame ? selected!.info : null,
+    frame,
+    /** Pick another element in the same frame by its ref, or clear the pick. */
+    select(ref: number | null) {
+      if (ref === null) {
+        for (const each of framesRef.current) sendToFrame(each, { type: 'inspect-select', ref: null })
         setSelected(null)
-        return
-      }
-      handles.current.get(frame)?.select(el, false)
-      setSelected({ el, frame })
+      } else if (selected) sendToFrame(selected.frame, { type: 'inspect-select', ref })
     },
   }
 }
@@ -122,8 +102,8 @@ export function useModifierHold(frames: HTMLIFrameElement[]): boolean {
       clearTimeout(timer)
       setHeld(false)
     }
-    const onDown = (event: KeyboardEvent) => {
-      if (isModifier(event.key)) {
+    const press = (key: string) => {
+      if (isModifier(key)) {
         if (down) return
         down = true
         combo = false
@@ -136,41 +116,27 @@ export function useModifierHold(frames: HTMLIFrameElement[]): boolean {
         setHeld(false)
       }
     }
+    const onDown = (event: KeyboardEvent) => press(event.key)
     const onUp = (event: KeyboardEvent) => {
       if (isModifier(event.key)) release()
     }
-    const bind = (win: Window) => {
-      win.addEventListener('keydown', onDown, true)
-      win.addEventListener('keyup', onUp, true)
-      win.addEventListener('blur', release)
-    }
-    const unbind = (win: Window) => {
-      win.removeEventListener('keydown', onDown, true)
-      win.removeEventListener('keyup', onUp, true)
-      win.removeEventListener('blur', release)
-    }
-    bind(window)
-    const cleanups = frames.map((frame) => {
-      let current: Window | null = null
-      const attach = () => {
-        if (current) unbind(current)
-        try {
-          current = frame.contentWindow
-          if (current) bind(current)
-        } catch {
-          current = null
-        }
-      }
-      attach()
-      frame.addEventListener('load', attach)
-      return () => {
-        frame.removeEventListener('load', attach)
-        if (current) unbind(current)
-      }
-    })
+    window.addEventListener('keydown', onDown, true)
+    window.addEventListener('keyup', onUp, true)
+    window.addEventListener('blur', release)
+    // Keys pressed inside a frame arrive from its runtime.
+    const offs = frames.map((frame) =>
+      listenToFrame(frame, (message: RuntimeMessage) => {
+        if (message.type === 'key') {
+          if (message.down) press(message.name)
+          else if (isModifier(message.name)) release()
+        } else if (message.type === 'blur') release()
+      }),
+    )
     return () => {
-      unbind(window)
-      for (const cleanup of cleanups) cleanup()
+      window.removeEventListener('keydown', onDown, true)
+      window.removeEventListener('keyup', onUp, true)
+      window.removeEventListener('blur', release)
+      for (const off of offs) off()
       clearTimeout(timer)
     }
   }, [frames])
@@ -284,7 +250,7 @@ function BoxModel({ info }: { info: ElementInfo }) {
   )
 }
 
-function Crumbs({ info, onSelect }: { info: ElementInfo; onSelect(el: Element): void }) {
+function Crumbs({ info, onSelect }: { info: ElementInfo; onSelect(ref: number): void }) {
   return (
     <div className="flex flex-wrap items-center gap-1 px-4 pb-2">
       {info.path.slice(-4).map((crumb, index) => (
@@ -292,7 +258,7 @@ function Crumbs({ info, onSelect }: { info: ElementInfo; onSelect(el: Element): 
         <span key={index} className="flex items-center gap-1">
           <button
             type="button"
-            onClick={() => onSelect(crumb.el)}
+            onClick={() => onSelect(crumb.ref)}
             className="cursor-pointer rounded-[4px] border-0 bg-soft2 px-1.5 py-0.5 font-mono text-[11px] text-ink2 hover:text-ink"
           >
             {crumb.label}
@@ -313,7 +279,7 @@ export function InspectorPanel({
   active,
 }: {
   info: ElementInfo | null
-  onSelect(el: Element): void
+  onSelect(ref: number): void
   onClose(): void
   /** Whether a frame is being inspected right now. */
   active: boolean
@@ -514,7 +480,7 @@ export function InspectorPanel({
                     // biome-ignore lint/suspicious/noArrayIndexKey: children are positional
                     key={index}
                     type="button"
-                    onClick={() => onSelect(child.el)}
+                    onClick={() => onSelect(child.ref)}
                     className="flex h-7 cursor-pointer items-center gap-2 rounded-[6px] border-0 bg-transparent px-2 text-left font-mono text-[12px] text-ink2 hover:bg-soft2"
                   >
                     <Icon name="chevron-right" size={12} className="text-muted" />
@@ -528,7 +494,7 @@ export function InspectorPanel({
       )}
       {info ? (
         <div className="flex shrink-0 items-center gap-2 border-t border-rule bg-soft px-4 py-2.5">
-          <Button icon="copy" onClick={() => void copyText(cssText(info), 'CSS copied')} className="grow">
+          <Button icon="copy" onClick={() => void copyText(info.css, 'CSS copied')} className="grow">
             Copy CSS
           </Button>
         </div>

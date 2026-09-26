@@ -15,13 +15,15 @@ export interface Rect {
 export const MIN_ZOOM = 0.02
 export const MAX_ZOOM = 8
 
-const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z))
+const clampZoom = (z: number, min = MIN_ZOOM) => Math.min(MAX_ZOOM, Math.max(min, z))
 
 type Listener = (camera: Camera) => void
 
 /** The canvas camera. Lives outside React so panning never re-renders the tree. */
 export class CameraStore {
   camera: Camera = { x: 0, y: 0, z: 1 }
+  /** How far out the camera may go; the viewport sets it from the size of the page. */
+  minZoom = MIN_ZOOM
   private listeners = new Set<Listener>()
   private animation = 0
 
@@ -33,7 +35,7 @@ export class CameraStore {
   }
 
   set(next: Camera) {
-    this.camera = { x: next.x, y: next.y, z: clampZoom(next.z) }
+    this.camera = { x: next.x, y: next.y, z: clampZoom(next.z, this.minZoom) }
     for (const listener of this.listeners) listener(this.camera)
   }
 
@@ -53,7 +55,7 @@ export class CameraStore {
   zoomAt(sx: number, sy: number, factor: number) {
     this.interrupt()
     const { x, y, z } = this.camera
-    const next = clampZoom(z * factor)
+    const next = clampZoom(z * factor, this.minZoom)
     const wx = (sx - x) / z
     const wy = (sy - y) / z
     this.set({ x: sx - wx * next, y: sy - wy * next, z: next })
@@ -62,7 +64,7 @@ export class CameraStore {
   animateTo(target: Camera, duration = 320) {
     this.interrupt()
     const from = { ...this.camera }
-    const to = { ...target, z: clampZoom(target.z) }
+    const to = { ...target, z: clampZoom(target.z, this.minZoom) }
     if (duration <= 0 || matchMedia('(prefers-reduced-motion: reduce)').matches) {
       this.set(to)
       return

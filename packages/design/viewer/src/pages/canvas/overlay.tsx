@@ -1,7 +1,8 @@
 import { DEVICES } from '@shared/devices'
-import type { CSSProperties } from 'react'
+import { type CSSProperties, memo, useMemo } from 'react'
 import { cn } from '../../lib/cn'
 import { useStore } from '../../lib/store'
+import { intersects, type Rect } from './camera'
 import { isFrame, type Layout, type Placed } from './layout'
 import type { ViewStore } from './view-state'
 
@@ -16,7 +17,7 @@ function deviceLabel(placed: Placed): string {
   return device ? `${device} · ${size}` : size
 }
 
-function Label({ placed, store }: { placed: Placed; store: ViewStore }) {
+const Label = memo(function Label({ placed, store }: { placed: Placed; store: ViewStore }) {
   const id = placed.item.id
   const selected = useStore(store, (state) => state.selected === id)
   const errors = useStore(store, (state) => state.frames[id]?.errors.length ?? 0)
@@ -39,7 +40,7 @@ function Label({ placed, store }: { placed: Placed; store: ViewStore }) {
       </span>
     </div>
   )
-}
+})
 
 function Outline({ placed, kind }: { placed: Placed; kind: 'selected' | 'active' | 'hover' }) {
   return (
@@ -54,13 +55,19 @@ function Outline({ placed, kind }: { placed: Placed; kind: 'selected' | 'active'
   )
 }
 
-/** Labels and outlines drawn in screen space so they stay crisp at every zoom. */
+/**
+ * Labels and outlines drawn in screen space so they stay crisp at every zoom.
+ * Only frames near the screen get a label: every label restyles as the camera moves.
+ */
 export function Overlay({
   layout,
+  view,
   store,
   overlayRef,
 }: {
   layout: Layout
+  /** The camera and viewport size, updated a few times a second while it moves. */
+  view: { x: number; y: number; z: number; w: number; h: number } | null
   store: ViewStore
   overlayRef: React.RefObject<HTMLDivElement | null>
 }) {
@@ -68,13 +75,20 @@ export function Overlay({
   const active = useStore(store, (state) => state.active)
   const hovered = useStore(store, (state) => state.hovered)
   const tiny = useStore(store, (state) => state.zoomTiny)
-  const frames = layout.items.filter((placed) => isFrame(placed.item))
+  const frames = useMemo(() => layout.items.filter((placed) => isFrame(placed.item)), [layout])
+  const near = useMemo(() => {
+    if (!view || tiny) return []
+    const { x, y, z, w, h } = view
+    // A screen of room on every side, so a quick pan does not outrun the labels.
+    const area: Rect = { x: -x / z - w / z, y: -y / z - h / z, w: (w / z) * 3, h: (h / z) * 3 }
+    return frames.filter((placed) => intersects(placed, area))
+  }, [frames, view, tiny])
   const find = (id: string | null) => (id ? layout.items.find((placed) => placed.item.id === id) : undefined)
   const selectedPlaced = find(selected)
   const hoveredPlaced = hovered && hovered !== selected ? find(hovered) : undefined
   return (
     <div ref={overlayRef} className="canvas-overlay" data-tiny={tiny}>
-      {frames.map((placed) => (
+      {near.map((placed) => (
         <Label key={placed.item.id} placed={placed} store={store} />
       ))}
       {hoveredPlaced ? <Outline placed={hoveredPlaced} kind="hover" /> : null}

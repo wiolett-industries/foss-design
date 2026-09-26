@@ -2,7 +2,7 @@ import type { ImageItem, NoteItem, ScreenItem, Theme, UrlItem } from '@shared/ty
 import { type RefObject, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../../lib/cn'
 import { useStore } from '../../lib/store'
-import { type Camera, type CameraStore, fitRect, intersects, type Rect } from './camera'
+import { type Camera, type CameraStore, fitRect, intersects, MIN_ZOOM, type Rect } from './camera'
 import { type FrameEvents, FrameItem, ImageView, NoteView, SectionHeader } from './items'
 import { isFrame, type Layout, type Placed } from './layout'
 import { Overlay } from './overlay'
@@ -10,10 +10,20 @@ import type { ViewStore } from './view-state'
 
 /** Frames rendered live at once; the rest show snapshots. */
 const MAX_LIVE = 12
-/** Live frames kept mounted after they scroll away, so coming back does not reload them. */
+/** Live frames kept mounted (asleep) after they scroll away, so coming back does not reload them. */
 const MAX_KEEP = 20
 /** A frame narrower than this on screen stays a snapshot. */
 const MIN_LIVE_PX = 110
+/** Frames loading at once: the rest wait their turn, nearest the middle of the screen first. */
+const MAX_LOADING = 3
+/** A frame that has not reported ready by then stops holding a loading slot. */
+const LOAD_TIMEOUT = 8000
+/** Grid spacing on screen stays between these, stepping by 4× as the zoom changes. */
+const GRID_MIN = 14
+const GRID_MAX = 96
+
+/** How a frame runs: live, mounted but asleep behind its snapshot, or not mounted. */
+export type FrameMode = 'live' | 'asleep' | 'off'
 
 export interface ViewportApi {
   fitAll(animate?: boolean): void
@@ -47,8 +57,9 @@ interface Drag {
 export function Viewport({ layout, theme, store, camera, events, capture, apiRef, onPlay, onSelect }: ViewportProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const worldRef = useRef<HTMLDivElement>(null)
+  const gridRef = useRef<HTMLDivElement>(null)
   const overlayRef = useRef<HTMLDivElement>(null)
-  const [view, setView] = useState<(Camera & { w: number; h: number }) | null>(null)
+  const [view, setView] = useState<View | null>(null)
   const panning = useStore(store, (state) => state.panning)
   const selected = useStore(store, (state) => state.selected)
   const active = useStore(store, (state) => state.active)
@@ -58,25 +69,41 @@ export function Viewport({ layout, theme, store, camera, events, capture, apiRef
   useLayoutEffect(() => {
     const root = rootRef.current!
     const world = worldRef.current!
+    const grid = gridRef.current!
     let settle: ReturnType<typeof setTimeout> | undefined
     let viewTimer: ReturnType<typeof setTimeout> | undefined
-    const publishView = () => setView({ ...camera.camera, w: root.clientWidth, h: root.clientHeight })
+    let moving = false
+    let gridSize = 0
+    const publishView = () => setView({ ...camera.camera, w: root.clientWidth, h: root.clientHeight, moving })
     const apply = (c: Camera) => {
       world.style.transform = `translate3d(${c.x}px, ${c.y}px, 0) scale(${c.z})`
-      world.classList.add('moving')
+      if (!moving) {
+        moving = true
+        world.classList.add('moving')
+      }
       clearTimeout(settle)
-      settle = setTimeout(() => world.classList.remove('moving'), 160)
+      settle = setTimeout(() => {
+        moving = false
+        world.classList.remove('moving')
+        // Frames held back while the camera moved may load now.
+        publishView()
+      }, 160)
       const overlay = overlayRef.current
       if (overlay) {
         overlay.style.setProperty('--tx', String(c.x))
         overlay.style.setProperty('--ty', String(c.y))
         overlay.style.setProperty('--z', String(c.z))
       }
-      let grid = 24 * c.z
-      while (grid < 14) grid *= 4
-      while (grid > 96) grid /= 4
-      root.style.backgroundSize = `${grid}px ${grid}px`
-      root.style.backgroundPosition = `${c.x}px ${c.y}px`
+      // The dot grid is a layer of its own: panning only moves it, zooming repaints it.
+      let size = 24 * c.z
+      while (size < GRID_MIN) size *= 4
+      while (size > GRID_MAX) size /= 4
+      if (size !== gridSize) {
+        gridSize = size
+        grid.style.backgroundSize = `${size}px ${size}px`
+      }
+      const shift = (v: number) => ((((v + GRID_MAX) % size) + size) % size) - size
+      grid.style.transform = `translate3d(${shift(c.x)}px, ${shift(c.y)}px, 0)`
       const tiny = c.z < 0.09
       if (store.get().zoomTiny !== tiny) store.set((state) => ({ ...state, zoomTiny: tiny }))
       viewTimer ??= setTimeout(() => {
@@ -106,6 +133,21 @@ export function Viewport({ layout, theme, store, camera, events, capture, apiRef
       clearTimeout(viewTimer)
     }
   }, [camera, store])
+
+  // Zooming out stops at half of what shows the whole page: past that there is nothing more to see.
+  useEffect(() => {
+    const root = rootRef.current!
+    const update = () => {
+      const { w, h } = { w: root.clientWidth, h: root.clientHeight }
+      const bounds = layout.bounds
+      const fit = bounds.w && w ? Math.min((w - 160) / bounds.w, (h - 160) / Math.max(bounds.h, 1)) : 1
+      camera.minZoom = Math.min(0.25, Math.max(MIN_ZOOM, fit * 0.5))
+    }
+    update()
+    const resize = new ResizeObserver(update)
+    resize.observe(root)
+    return () => resize.disconnect()
+  }, [camera, layout.bounds])
 
   // Imperative controls for the page: fit, zoom, focus.
   useEffect(() => {
@@ -146,11 +188,22 @@ export function Viewport({ layout, theme, store, camera, events, capture, apiRef
     }
   }, [apiRef, camera, layout])
 
-  // Which frames run live.
+  // Which frames run. Those in view (up to MAX_LIVE, the largest share of the screen first) are
+  // live; frames seen recently stay mounted but asleep behind their snapshot, so coming back
+  // does not reload them. New frames load a few at a time, and only once the camera rests:
+  // a fling across the page loads nothing on the way.
   const keep = useRef<string[]>([])
-  const live = useMemo(() => {
-    if (capture) return new Set(frames.map((placed) => placed.item.id))
-    if (!view) return new Set<string>()
+  const mountedAt = useRef(new Map<string, number>())
+  const [recheck, setRecheck] = useState(0)
+  const ready = useStore(store, (state) => readyKey(state.frames))
+  const modes = useMemo(() => {
+    void recheck
+    const modes = new Map<string, FrameMode>()
+    if (capture) {
+      for (const placed of frames) modes.set(placed.item.id, 'live')
+      return modes
+    }
+    if (!view) return modes
     const { x, y, z, w, h } = view
     const screen: Rect = { x: -x / z, y: -y / z, w: w / z, h: h / z }
     const margin: Rect = {
@@ -159,22 +212,56 @@ export function Viewport({ layout, theme, store, camera, events, capture, apiRef
       w: screen.w * 1.5,
       h: screen.h * 1.5,
     }
+    const cx = screen.x + screen.w / 2
+    const cy = screen.y + screen.h / 2
     const overlap = (p: Placed) => {
       const ox = Math.max(0, Math.min(p.x + p.w, screen.x + screen.w) - Math.max(p.x, screen.x))
       const oy = Math.max(0, Math.min(p.y + p.h, screen.y + screen.h) - Math.max(p.y, screen.y))
       return ox * oy
     }
+    const distance = (p: Placed) => Math.hypot(p.x + p.w / 2 - cx, p.y + p.h / 2 - cy)
     const visible = frames
       .filter((p) => intersects(p, margin) && p.w * z >= MIN_LIVE_PX)
-      .sort((a, b) => overlap(b) - overlap(a))
+      .sort((a, b) => overlap(b) - overlap(a) || distance(a) - distance(b))
       .slice(0, MAX_LIVE)
       .map((p) => p.item.id)
     const pinned = [active, selected].filter((id): id is string => !!id)
     const ids = new Set(frames.map((p) => p.item.id))
-    const next = [...new Set([...pinned, ...visible, ...keep.current])].filter((id) => ids.has(id)).slice(0, MAX_KEEP)
+    const readyIds = new Set(ready.split('\n'))
+    const mounted = new Set(keep.current)
+    const now = performance.now()
+    const loading = (id: string) => !readyIds.has(id) && now - (mountedAt.current.get(id) ?? 0) < LOAD_TIMEOUT
+    let slots = MAX_LOADING - [...mounted].filter(loading).length
+    const live: string[] = []
+    for (const id of new Set([...pinned, ...visible])) {
+      if (!ids.has(id)) continue
+      if (mounted.has(id)) live.push(id)
+      else if (pinned.includes(id) || (!view.moving && slots > 0)) {
+        live.push(id)
+        mountedAt.current.set(id, now)
+        slots--
+      }
+    }
+    const next = [...new Set([...live, ...keep.current])].filter((id) => ids.has(id)).slice(0, MAX_KEEP)
     keep.current = next
-    return new Set(next)
-  }, [view, frames, active, selected, capture])
+    for (const id of mountedAt.current.keys()) if (!next.includes(id)) mountedAt.current.delete(id)
+    for (const id of next) modes.set(id, live.includes(id) ? 'live' : 'asleep')
+    return modes
+  }, [view, frames, active, selected, capture, ready, recheck])
+
+  // A frame that never reports ready gives up its loading slot after a while.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: modes changes when frames start loading
+  useEffect(() => {
+    const now = performance.now()
+    const readyIds = new Set(ready.split('\n'))
+    const waits = [...mountedAt.current]
+      .filter(([id]) => !readyIds.has(id))
+      .map(([, at]) => at + LOAD_TIMEOUT - now)
+      .filter((wait) => wait > 0)
+    if (!waits.length) return
+    const timer = setTimeout(() => setRecheck((n) => n + 1), Math.min(...waits) + 20)
+    return () => clearTimeout(timer)
+  }, [modes, ready])
 
   // Pointer: drag pans, click selects (and lets the frame take the pointer), two fingers pinch.
   const drag = useRef<Drag | null>(null)
@@ -309,7 +396,7 @@ export function Viewport({ layout, theme, store, camera, events, capture, apiRef
     <div
       ref={rootRef}
       className={cn(
-        'canvas-dots relative h-full w-full touch-none overflow-hidden select-none',
+        'canvas-root relative h-full w-full touch-none overflow-hidden select-none',
         panning && 'canvas-panning cursor-grabbing',
       )}
       onPointerDown={onPointerDown}
@@ -323,6 +410,7 @@ export function Viewport({ layout, theme, store, camera, events, capture, apiRef
         if (placed && isFrame(placed.item)) onPlay(placed.item.id)
       }}
     >
+      <div ref={gridRef} className="canvas-grid" />
       <div ref={worldRef} className="canvas-world">
         {pages.map((placed) => (
           <SectionHeader
@@ -341,7 +429,7 @@ export function Viewport({ layout, theme, store, camera, events, capture, apiRef
               <FrameItem
                 key={item.id}
                 placed={placed as Placed & { item: ScreenItem | UrlItem }}
-                live={live.has(item.id)}
+                mode={modes.get(item.id) ?? 'off'}
                 theme={theme}
                 store={store}
                 events={events}
@@ -353,9 +441,24 @@ export function Viewport({ layout, theme, store, camera, events, capture, apiRef
           return <ImageView key={item.id} placed={placed as Placed & { item: ImageItem }} store={store} />
         })}
       </div>
-      <Overlay layout={layout} store={store} overlayRef={overlayRef} />
+      <Overlay layout={layout} view={view} store={store} overlayRef={overlayRef} />
     </div>
   )
+}
+
+interface View extends Camera {
+  w: number
+  h: number
+  /** The camera moved in the last moments; new frames wait until it rests. */
+  moving: boolean
+}
+
+/** The ids of frames that reported ready, as one string so the viewport re-renders only when it changes. */
+function readyKey(frames: Record<string, { ready: boolean }>): string {
+  return Object.keys(frames)
+    .filter((id) => frames[id]!.ready)
+    .sort()
+    .join('\n')
 }
 
 export function isTyping(target: EventTarget | null): boolean {

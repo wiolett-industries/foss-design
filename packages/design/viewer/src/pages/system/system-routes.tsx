@@ -16,16 +16,18 @@ import { ShapePage } from './shape'
 import { TypographyPage } from './typography'
 
 function Layout({ system }: { system: SystemDoc }) {
+  // The vertical padding lives inside the columns, not on <main>: the sidebar sticks right
+  // under the 52px bar and its scroll area runs to the bottom edge of the window.
   return (
-    <main className="mx-auto flex w-full max-w-[1440px] grow animate-[q-fade-in_160ms_ease-out] px-8 pt-6 pb-7 max-md:px-4 max-md:pt-4">
+    <main className="mx-auto flex w-full max-w-[1440px] grow animate-[q-fade-in_160ms_ease-out] px-8 max-md:px-4">
       <div
-        className="grid w-full items-start gap-6 max-lg:grid-cols-1!"
+        className="grid w-full items-start gap-6 max-lg:grid-cols-1! max-lg:gap-0"
         style={{ gridTemplateColumns: '232px minmax(0, 1fr)' }}
       >
-        <aside className="sticky top-[76px] flex max-h-[calc(100dvh-100px)] flex-col overflow-y-auto pb-4 max-lg:static max-lg:max-h-none max-lg:overflow-visible max-lg:pb-0">
+        <aside className="sticky top-[52px] flex max-h-[calc(100dvh-52px)] flex-col overflow-y-auto pt-6 pb-4 max-lg:static max-lg:max-h-none max-lg:overflow-visible max-lg:pb-0 max-md:pt-4">
           <SystemNav system={system} />
         </aside>
-        <div className="flex min-w-0 flex-col gap-5">
+        <div className="flex min-w-0 flex-col gap-5 pt-6 pb-7">
           <Switch>
             <Route path="/system">
               <OverviewPage system={system} />

@@ -12,7 +12,7 @@ import { Mark } from '../../components/wordmark'
 import { useCanvas } from '../../lib/api'
 import { copyText } from '../../lib/copy'
 import { takeFocus } from '../../lib/focus'
-import { absoluteUrl, frameSrc } from '../../lib/frames'
+import { absoluteUrl, frameSrc, reloadFrame } from '../../lib/frames'
 import { useStore } from '../../lib/store'
 import { useTheme } from '../../lib/theme'
 import { Button, IconButton } from '../../ui/button'
@@ -83,7 +83,7 @@ function CanvasView({ canvas, page }: { canvas: CanvasDoc; page: Page | undefine
   }, [inspect, store])
   const inspection = useInspection(screenFrames, inspect, { onEscape: () => setInspect(false) })
   // Holding ⌘/Ctrl only highlights; picking an element switches Inspect on for good.
-  const picked = inspection.info?.el
+  const picked = !!inspection.info
   useEffect(() => {
     if (picked) setInspect(true)
   }, [picked])
@@ -187,7 +187,7 @@ function CanvasView({ canvas, page }: { canvas: CanvasDoc; page: Page | undefine
         console.warn(`[design] go("${target}"): no such screen`)
       },
       onWheel(frame, message) {
-        const root = frame.closest('.canvas-dots') as HTMLElement | null
+        const root = frame.closest('.canvas-root') as HTMLElement | null
         if (!root) return
         const rootRect = root.getBoundingClientRect()
         const rect = frame.getBoundingClientRect()
@@ -477,14 +477,8 @@ function SelectionBar({
       : item.kind === 'url'
         ? item.url
         : null
-  const reload = () => {
-    const iframe = document.querySelector<HTMLIFrameElement>(`[data-item="${CSS.escape(item.id)}"] iframe`)
-    try {
-      iframe?.contentWindow?.location.reload()
-    } catch {
-      iframe?.setAttribute('src', iframe.getAttribute('src') ?? '')
-    }
-  }
+  const reload = () =>
+    reloadFrame(document.querySelector<HTMLIFrameElement>(`[data-item="${CSS.escape(item.id)}"] iframe`))
   const errors = status?.errors ?? []
   return (
     <div data-ui className="pointer-events-none absolute inset-x-0 bottom-5 z-20 flex justify-center px-4">

@@ -216,7 +216,67 @@ export type DesignEvent =
   | { type: 'system' }
   | { type: 'snapshot'; canvas: string; id: string; theme: Theme; url: string; height?: number }
 
-/** Messages between the viewer and the runtime inside each frame. */
+/** Top, right, bottom, left. */
+export type Box = [top: number, right: number, bottom: number, left: number]
+
+/** An element in an inspected frame; `ref` names it in messages back to the frame. */
+export interface Crumb {
+  ref: number
+  label: string
+}
+
+export interface ColorValue {
+  /** Readable: hex when the color is sRGB. */
+  value: string
+  /** As computed, for painting a swatch. */
+  css: string
+  token?: string
+}
+
+/** What the inspector reports about the element picked in a frame. */
+export interface ElementInfo {
+  ref: number
+  tag: string
+  label: string
+  text?: string
+  classes: string[]
+  attributes: [string, string][]
+  component?: { owners: string[]; file?: string }
+  rect: { x: number; y: number; w: number; h: number }
+  margin: Box
+  border: Box
+  padding: Box
+  layout: [string, string][]
+  typography?: {
+    family: string
+    familyToken?: string
+    size: string
+    sizeToken?: string
+    weight: string
+    lineHeight: string
+    letterSpacing: string
+    color: ColorValue
+    align: string
+    transform?: string
+  }
+  appearance: {
+    background?: ColorValue
+    backgroundImage?: string
+    border?: { width: string; style: string; color: ColorValue }
+    radius?: { value: string; token?: string }
+    shadow?: { value: string; token?: string }
+    opacity?: string
+  }
+  path: Crumb[]
+  children: Crumb[]
+  /** The CSS worth copying, as a block. */
+  css: string
+}
+
+/**
+ * Messages between the viewer and the runtime inside each frame. Frames may
+ * sit on another origin than the viewer, so everything goes through postMessage.
+ */
 export type RuntimeMessage =
   | { source: 'design-runtime'; key: string; type: 'ready' }
   | { source: 'design-runtime'; key: string; type: 'size'; width: number; height: number }
@@ -234,9 +294,20 @@ export type RuntimeMessage =
       zoom: boolean
     }
   | { source: 'design-runtime'; key: string; type: 'keydown'; code: string }
+  /** ⌘/Ctrl pressed or released in the frame, or a key pressed while one is down. */
+  | { source: 'design-runtime'; key: string; type: 'key'; name: string; down: boolean }
+  | { source: 'design-runtime'; key: string; type: 'blur' }
   | { source: 'design-runtime'; key: string; type: 'updated' }
+  /** The picked element changed, or its styles did; null when nothing is picked. */
+  | { source: 'design-runtime'; key: string; type: 'inspect'; info: ElementInfo | null }
+  /** Escape while inspecting with nothing picked. */
+  | { source: 'design-runtime'; key: string; type: 'inspect-escape' }
 
 export type ViewerMessage =
   | { source: 'design-viewer'; type: 'theme'; theme: Theme }
   /** The frame is on the canvas: pan and zoom with the wheel go to the viewer. */
   | { source: 'design-viewer'; type: 'canvas' }
+  /** Inspect mode on or off; `tokens` let the frame name the tokens behind computed styles. */
+  | { source: 'design-viewer'; type: 'inspect'; on: boolean; tokens?: Token[] }
+  /** Pick an element by the `ref` a previous report gave it, or clear the pick without reporting. */
+  | { source: 'design-viewer'; type: 'inspect-select'; ref: number | null }
