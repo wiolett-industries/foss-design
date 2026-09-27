@@ -1,4 +1,3 @@
-import { go } from '@design/runtime'
 import { Check } from 'lucide-react'
 import { motion } from 'motion/react'
 
@@ -21,12 +20,12 @@ export default function Done() {
       <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.45 }} className="mt-2 text-body text-muted">
         Your workspace is ready. Invite two teammates to see it come alive.
       </motion.p>
-      <button type="button" onClick={() => go('desktop/dashboard')} className="mt-10 h-12 w-full rounded-control bg-accent text-body font-medium text-accent-ink">
+      <a href="/dashboard" className="mt-10 flex h-12 w-full items-center justify-center rounded-control bg-accent text-body font-medium text-accent-ink no-underline">
         Open workspace
-      </button>
-      <button type="button" onClick={() => go('welcome')} className="mt-2 h-11 text-body text-ink-2">
+      </a>
+      <a href="/" className="mt-2 flex h-11 items-center justify-center text-body text-ink-2 no-underline">
         Start over
-      </button>
+      </a>
     </main>
   )
 }

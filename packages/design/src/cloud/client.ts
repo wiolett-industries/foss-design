@@ -38,6 +38,20 @@ export interface RemoteUnit {
   /** Source files of the head revision, relative to `.design`. */
   manifest: Manifest
   systemRev: number | null
+  /** Set while the canvas is published: its public page is `<host>/s/<publicId>`. */
+  publicId: string | null
+}
+
+export interface RemoteRevision {
+  rev: number
+  head: boolean
+  createdAt: string
+  author: string | null
+  /** System revision the canvas was built against. */
+  systemRev: number | null
+  screens: number | null
+  bytes: number | null
+  rollbackAllowed: boolean
 }
 
 export interface PushUnit {
@@ -151,6 +165,28 @@ function parseUnit(value: unknown): RemoteUnit | null {
     banned: flag(data.banned, data.bannedAt, data.banned_at),
     manifest: parseManifest(data.sourceManifest ?? data.source_manifest ?? data.source),
     systemRev: num(data.systemRev) ?? num(data.system_rev) ?? null,
+    publicId: str(data.publicId) ?? null,
+  }
+}
+
+function parseRevision(value: unknown): RemoteRevision | null {
+  const data = record(value)
+  const rev = num(data.rev)
+  if (rev === undefined) return null
+  const stats = record(data.stats)
+  const author = record(data.author)
+  return {
+    rev,
+    head: data.head === true,
+    createdAt: str(data.createdAt) ?? '',
+    author: text(author.name) ?? null,
+    systemRev: num(data.systemRev) ?? null,
+    screens: num(stats.screens) ?? null,
+    bytes:
+      num(stats.sourceBytes) === undefined && num(stats.buildBytes) === undefined
+        ? null
+        : (num(stats.sourceBytes) ?? 0) + (num(stats.buildBytes) ?? 0),
+    rollbackAllowed: data.rollbackAllowed === true,
   }
 }
 
@@ -278,6 +314,42 @@ export class CloudClient {
       if (unit) units.set(unit.key, unit)
     }
     return units
+  }
+
+  /** A unit's stored revisions, newest first. */
+  async revisions(projectId: string, key: string): Promise<RemoteRevision[]> {
+    const body = await this.request(
+      'GET',
+      `/projects/${encodeURIComponent(projectId)}/units/${encodeURIComponent(key)}/revisions`,
+    )
+    return (Array.isArray(body) ? body : []).map(parseRevision).filter((rev): rev is RemoteRevision => !!rev)
+  }
+
+  /** Makes an old revision of a canvas its new head; returns that head. */
+  async rollback(projectId: string, key: string, rev: number): Promise<number> {
+    const body = record(
+      await this.request(
+        'POST',
+        `/projects/${encodeURIComponent(projectId)}/units/${encodeURIComponent(key)}/rollback`,
+        { rev },
+      ),
+    )
+    return num(body.rev) ?? rev
+  }
+
+  /** Archive, unarchive, publish or unpublish a canvas; publish answers its public id. */
+  async canvasAction(
+    projectId: string,
+    canvas: string,
+    action: 'archive' | 'unarchive' | 'publish' | 'unpublish',
+  ): Promise<{ publicId: string | null }> {
+    const body = record(
+      await this.request(
+        'POST',
+        `/projects/${encodeURIComponent(projectId)}/canvases/${encodeURIComponent(canvas)}/${action}`,
+      ),
+    )
+    return { publicId: str(body.publicId) ?? null }
   }
 
   /** POST /blobs/missing, in batches: the hashes the cloud does not have yet. */

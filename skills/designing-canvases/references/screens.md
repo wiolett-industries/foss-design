@@ -10,7 +10,6 @@ Export a React component, preferably as the default export. If there is no defau
 import { useState } from 'react'
 import { motion } from 'motion/react'
 import { ArrowRight } from 'lucide-react'
-import { go, useTheme } from '@design/runtime'
 import { Button } from '@system/components/button'
 
 export default function SignUp({ error }: { error?: string }) {
@@ -22,7 +21,7 @@ export default function SignUp({ error }: { error?: string }) {
         animate={{ opacity: 1, y: 0 }}
         onSubmit={(event) => {
           event.preventDefault()
-          go('verify')
+          history.pushState(null, '', '/verify')
         }}
         className="flex w-full max-w-sm flex-col gap-4"
       >
@@ -83,66 +82,32 @@ The viewer sets `data-theme="light"` or `data-theme="dark"` and the `dark` class
 ## Runtime API (`@design/runtime`)
 
 ```ts
-import { go, useTheme, useScreen } from '@design/runtime'
+import { useTheme, useScreen } from '@design/runtime'
 ```
 
 | Export | What it does |
 | --- | --- |
-| `go(target: string)` | Moves to another screen. `target` is a screen id on the same canvas, or `page-id/screen-id`. On the canvas the viewer brings the target into view and selects it; in play mode it opens it. Outside the viewer it only logs. |
 | `useTheme(): 'light' \| 'dark'` | The theme the frame is shown in; re-renders on change. |
 | `useScreen(): { canvas, id, props }` | Where this frame sits and the props `canvas.json` gave it. |
 
-Clickable prototypes: keep interaction state in React state inside the screen (tabs, modals, form steps), and use `go()` only to move between frames that are separate screens on the canvas.
+`go()` was removed in 0.5: `design check` reports it as an error and `design push` refuses screens that use it.
 
-Links and forms. A frame shows one screen; it cannot follow a link to another page of a site. The runtime keeps the frame where it is and tells the viewer where the link pointed:
+## Links between screens
 
-- a link whose path ends in a screen id on the canvas (`href="/settings"`, `settings.html`) opens that screen, like `go('settings')`;
-- a link to another site opens in a new tab;
-- any other link, and a form submit the screen does not handle itself, stay on the screen with a note in the viewer.
+Screens link like the app does, and never need anything design-specific for it:
 
-So wire navigation on purpose: sidebars, tabs, breadcrumbs and buttons call `go('<screen-id>')` (or use an `href` ending in that id) for every destination that has a screen, and use `href="#"` for the rest. Handle `onSubmit` with `preventDefault()` and move on with `go()` or state. Links inside the page (`#section`) scroll as usual, and a router inside the screen (its own `pushState`) keeps working.
+- Give every screen that stands for a page of the app its URL as `route` in `canvas.json` (`"route": "/settings"`, patterns such as `/orders/:id`; see the canvas.json reference).
+- Links are plain links: `<a href="/settings">`, the app's own `Link` components, nav items with `href`. Clicking one opens the screen whose route matches.
+- Moves from code (after a form submits, a timer, a wizard step) go through the history API, as a router does: `history.pushState(null, '', '/verify')`, or the app router's `navigate('/verify')` when the screen has one.
+- Interaction inside one screen (tabs, modals, filters, form steps) stays in React state.
+- A destination with no screen is `href="#"`; do not invent paths.
 
-## Frame size and scrolling
-
-- A fixed frame (`device`, or numeric `width`/`height`) is one viewport: the page scrolls inside it, `100vh`/`min-h-screen` equals the frame height, and `position: fixed` headers behave like on a device.
-- `"height": "auto"` grows the frame to the content (up to 40 000 px). Use it for landing pages and long documents. Content height is measured from the body's children, so avoid layouts whose height depends on the viewport alone (`h-screen` on the only child) in auto frames; `min-h-screen` is fine.
-- The canvas shows frames at the zoom level but never rescales their content: design for the frame's CSS size.
-
-## HTML screens
-
-An `.html` file (with anything next to it: CSS, JS, images) is served as a page. foss-design adds to its `<head>`: the frame configuration, the design system stylesheet, `system.json` fonts, and the runtime (theme, size reporting, error reporting).
-
-```html
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Landing</title>
-  <link rel="stylesheet" href="./landing.css">
-</head>
-<body>
-  <main class="mx-auto max-w-5xl px-6 py-24">…</main>
-  <script type="module" src="./landing.ts"></script>
-</body>
-</html>
-```
-
-- Relative URLs resolve next to the HTML file; module scripts go through Vite, so TypeScript, JSX and npm imports (including `@design/runtime` and `@system/...`) work inside them.
-- Opt out of the design system stylesheet with `<meta name="design:system" content="off">` (or `"system": false` in `canvas.json`) when the page brings its own complete styling.
-- Use HTML screens for static marketing pages, emails, print pieces and ports of existing HTML; use module screens for anything interactive.
-
-## Assets and fonts
-
-- Images and media for one canvas: `.design/canvas/<id>/assets/`, imported from module screens (`import src from '../assets/photo.jpg'`) or referenced relatively from HTML screens.
-- Shared brand assets (logos, icons, font files): `.design/system/assets/`.
-- Web fonts: list stylesheet URLs (such as Google Fonts) in `system.json` `fonts`; every screen loads them. Self-hosted fonts: `@font-face` in `tokens.css` with files in `system/assets/fonts/`.
-
-## Online and offline
+The runtime keeps the frame on its screen whatever a link does: a link to another site opens in a new tab, `#section` links scroll, a path no route matches stays put with a note (and a warning in `design check --render`), and a router inside the screen keeps working for paths no other screen has.
 
 Screens run in a normal browser page on `localhost`: they may call real APIs and load remote images and fonts. Everything else (Tailwind, the tokens, the shipped packages, local assets) works offline. Prefer local sample data in screens so designs do not depend on a network or a running backend.
 
 ## Checks
 
-- `design check <canvas> --render` loads every screen in headless Chrome and reports build errors, uncaught exceptions and console errors, plus `canvas.json` problems.
+- `design check <canvas> --render` loads every screen in headless Chrome and reports build errors, uncaught exceptions and console errors, plus `canvas.json` problems, `go()` calls, and links that lead to no screen (grouped by path, with the screens they appear in).
 - `design shot <canvas>[/<screen>] [--theme dark] [--page <id>] [--overview]` writes PNGs and prints their paths. Read them to review the result.
 - The viewer's frames show Vite's error overlay for syntax and import errors while you edit.

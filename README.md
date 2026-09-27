@@ -92,7 +92,7 @@ A minimal `canvas.json`:
 }
 ```
 
-Screens get Tailwind v4 with the design tokens, React, `motion`, `lucide-react`, `clsx` and `tailwind-merge` even when the project has none of them (the project's own copies win when present), plus the project's other packages and any aliases from `design.json`. A screen moves to another with `go('verify')` from `@design/runtime`; a link whose path ends in a screen id opens that screen, and other links and forms never take the frame off its screen.
+Screens get Tailwind v4 with the design tokens, React, `motion`, `lucide-react`, `clsx` and `tailwind-merge` even when the project has none of them (the project's own copies win when present), plus the project's other packages and any aliases from `design.json`. Screens link like the app does: give each screen its app URL as `route` in `canvas.json` (`"route": "/orders/:id"`), and a plain `<a href="/orders/42">` or a router's `navigate()` in any screen opens the screen whose route matches. Other links and forms never take the frame off its screen, and `design check --render` lists links that lead to no screen. (`go()` from `@design/runtime` was removed in 0.5.)
 
 The complete formats are in the skills: [canvas.json](skills/designing-canvases/references/canvas-json.md), [screens and runtime](skills/designing-canvases/references/screens.md), [design system](skills/building-design-systems/references/system-format.md).
 
@@ -103,16 +103,23 @@ The complete formats are in the skills: [canvas.json](skills/designing-canvases/
 | `design init [--name <name>] [--no-gitignore]` | Create `.design` and add it to `.gitignore`. |
 | `design system init [--name <name>] [--empty]` | Scaffold `.design/system`: tokens, a guideline, a component and its specimen. |
 | `design new <canvas> [--title <title>] [--empty]` | Scaffold `.design/canvas/<canvas>`. |
+| `design canvases [--json]` | List the canvases with pages and screens; when linked, also each one's revision, sync state, web link and public link. |
 | `design preview [--open [path]] [--port <n>] [--restart] [--foreground]` | Start the viewer in the background, or reuse the running one, and print its URL. |
 | `design stop` | Stop the viewer. |
 | `design status` | Viewer state, a project summary and, when linked, the cloud state of each unit. |
-| `design check [canvas…] [--render] [--json]` | Validate `canvas.json` and the system; `--render` loads every screen and specimen in Chrome and reports runtime errors. |
+| `design check [canvas…] [--render] [--json]` | Validate `canvas.json` and the system and report `go()` calls; `--render` loads every screen and specimen in Chrome and reports runtime errors and links that lead to no screen. |
 | `design shot <canvas>[/<screen>] [--page <id>] [--theme light\|dark] [--out <dir>] [--overview]` | Screenshot screens (or whole pages with `--overview`; `@system[/<id>]` for specimens); prints the PNG paths. |
 | `design build [canvas…] [--out <dir>] [--tar]` | Build a static site of the canvases and the design system, optionally packed as an archive. |
 | `design login` / `design logout` | Sign this machine in to [foss-design Cloud](#cloud) or forget its token. |
+| `design me [--json]` | The signed-in cloud account: plan and its end date, storage, active projects, canvases, pushes, and the linked project. |
 | `design link [<project>] [--new <name>]` | List your cloud projects, or link `.design` to one (or to a new one). |
 | `design push [canvas…] [--resolved <unit>] [--json]` | Build and upload what changed, with progress, then print the web link of each pushed canvas; stops when the cloud is ahead. |
 | `design pull [canvas…] [--theirs <unit>] [--json]` | Take cloud changes; a unit changed on both sides becomes a conflict (exit 2). |
+| `design url <canvas> [--json]` | The canvas in the web app, and its public link when published. |
+| `design history <canvas\|system> [--json]` | Stored revisions, newest first: when, who, screens, size. |
+| `design rollback <canvas> <rev>` | Make an old revision current again in the cloud (as a new revision), then pull it. |
+| `design publish <canvas>` / `design unpublish <canvas>` | Give the canvas a public link anyone can open, or turn it off (owner only). |
+| `design archive <canvas>` / `design unarchive <canvas>` | Archive a canvas in the cloud (out of the list and pushes, history kept), or bring it back. |
 
 `--root <dir>` points any command at a project; by default the nearest folder with `.design` is used. The viewer listens on a free port picked at start, so several projects can preview at once; `--port` or `"port"` in `design.json` pins one. It opens a browser only with `--open`.
 
@@ -127,14 +134,14 @@ The complete formats are in the skills: [canvas.json](skills/designing-canvases/
 - `/c/<canvas>` is the canvas: drag or scroll to pan, pinch or ⌘/Ctrl + scroll to zoom, ⇧1 to fit. Click a screen to interact with it, Esc to leave, Enter or double-click to play it full size.
 
   Big canvases stay smooth: screens in view run live from 20% zoom (up to 12, a few loading at a time once the camera rests), screens you passed sleep behind a snapshot and wake without reloading, and the rest show snapshots — small ones when zoomed out, full ones up close. The dev server loads frames from the viewer's twin host (`127.0.0.1` when the viewer is on `localhost`, and the other way round), so the browser runs them in their own process and they cannot stall panning; open the viewer on either of the two for that. Zooming out stops at 10%; a page too big to see at 20% opens at its top instead of all at once.
-- `/c/<canvas>/play/<screen>` shows one screen with previous and next.
+- `/c/<canvas>/play/<screen>` shows one screen with previous and next. Links between screens follow screen routes on the canvas, in play mode and on a phone.
 - **Inspect** (the button in the top bar, or `I`) on the canvas and in play: hover a screen to see margin, padding and content, click an element for the right-hand panel — the React component that rendered it and its file, box model, layout, typography, colors, radius and shadow traced back to design tokens, Tailwind classes, attributes, children — and copy its CSS. Clicks go to the inspector, not the screen. Hold ⌘/Ctrl to highlight without switching Inspect on; click while holding to pick.
 - `/system` is the style guide.
 - On a phone (under 768px) a canvas is one screen at a time instead of a board: the screen fills the width and scrolls, the bottom bar steps through every screen and lists them by page and section, and a screen wider than the phone fits the width or shows at 100% and scrolls both ways. The canvases and the design system are tabs under the top bar.
 
 ## Cloud
 
-[foss-design Cloud](https://fossdesign.dev) keeps a copy of the `.design` folder: push from one checkout and pull into another, invite editors and viewers, publish a canvas by link. Screens are built on your machine; a canvas changed on both sides lands in `.design/.cache/cloud/incoming/` to merge. Pulled screens run in your local viewer, so invite as editors only people you trust.
+[foss-design Cloud](https://fossdesign.dev) keeps a copy of the `.design` folder: push from one checkout and pull into another, invite editors and viewers, publish a canvas by link. The skill offers the free cloud once to a project that is not linked, and a linked project gets its work handed over as cloud links (`design push`) instead of a local viewer that is not running. Screens are built on your machine; a canvas changed on both sides lands in `.design/.cache/cloud/incoming/` to merge. Pulled screens run in your local viewer, so invite as editors only people you trust.
 
 ```bash
 design login               # prints a link with the code in it; open it and confirm

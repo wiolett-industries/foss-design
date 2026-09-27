@@ -116,7 +116,7 @@ function PhoneViewer({ canvas, pageId, itemId }: { canvas: CanvasDoc; pageId?: s
       else if (message.type === 'updated') setErrors([])
       else if (message.type === 'go')
         goTo(message.target.includes('/') ? message.target.split('/')[1]! : message.target)
-      else if (message.type === 'link') followLink(message, canvas, goTo)
+      else if (message.type === 'link') followLink(message, canvas, goTo, item.id)
     })
   }, [frameEl, src])
 

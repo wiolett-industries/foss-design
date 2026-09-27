@@ -2,6 +2,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { mapLimit } from '../capture/frames'
 import { CliError } from '../cli/log'
+import { GO_REMOVED, legacyGoLines } from '../core/canvas'
+import { relToRoot } from '../core/paths'
 import { DesignProject } from '../core/project'
 import { STATIC_URLS } from '../core/sources'
 import { CloudError, type PushUnit, type RemoteUnit } from './client'
@@ -119,6 +121,9 @@ export async function push(ctx: SyncContext, options: { units: string[]; resolve
     }
     toPush.push(key)
   }
+
+  // A system change rebuilds every canvas, so each of them has to build without go().
+  refuseLegacyGo(paths, toPush.includes(SYSTEM_UNIT) ? scan.units.keys() : toPush)
 
   const blocked: UnitReport[] = []
   const systemPush = toPush.includes(SYSTEM_UNIT)
@@ -284,4 +289,21 @@ export async function push(ctx: SyncContext, options: { units: string[]; resolve
   writeLink(paths, link)
   report.units.sort((a, b) => byUnit(a.unit, b.unit))
   return report
+}
+
+/** Screens still calling the removed `go()` stop the push before anything is built. */
+function refuseLegacyGo(paths: SyncContext['paths'], keys: Iterable<string>) {
+  const project = new DesignProject(paths, STATIC_URLS)
+  const hits = new Set<string>()
+  for (const key of keys) {
+    if (!key.startsWith('canvas/')) continue
+    for (const screen of project.canvas(key.slice('canvas/'.length))?.screens ?? []) {
+      for (const line of legacyGoLines(screen.file)) hits.add(`${relToRoot(paths, screen.file)}:${line}`)
+    }
+  }
+  if (!hits.size) return
+  const list = [...hits]
+  throw new CliError(
+    `${GO_REMOVED}.\nStill using go():\n  ${list.slice(0, 20).join('\n  ')}${list.length > 20 ? `\n  …and ${list.length - 20} more` : ''}`,
+  )
 }

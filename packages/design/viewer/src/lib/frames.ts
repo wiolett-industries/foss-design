@@ -1,3 +1,4 @@
+import { compileRoute, linkPath, matchRoute } from '@shared/routes'
 import type { CanvasDoc, RuntimeMessage, Theme, ViewerMessage } from '@shared/types'
 import { toast } from '../ui/toast'
 import { STATIC_SITE } from './source'
@@ -93,14 +94,17 @@ export function absoluteUrl(url: string): string {
 }
 
 /**
- * A link or form the runtime kept from leaving its frame. A path whose last part names a screen
- * or URL item on the canvas (`/settings`, `settings.html`) goes there; a link to another site
- * opens in a new tab; anything else says where it pointed.
+ * A link, form or history push the runtime kept from leaving its frame. The path goes to the
+ * screen whose `route` matches it best (a relative `href` resolves against the route of the
+ * screen it is in); without routes, a path whose last part names a screen still opens it. A
+ * link to another site opens in a new tab. A push nobody's route matches belongs to the
+ * screen's own router; a link or form that leads nowhere stays put with a note.
  */
 export function followLink(
   message: Extract<RuntimeMessage, { type: 'link' }>,
   canvas: CanvasDoc,
   go: (id: string) => void,
+  from?: string,
 ) {
   if (message.form) {
     toast('Forms are not sent from a screen', undefined, 'info')
@@ -112,18 +116,25 @@ export function followLink(
     else toast('Link to another site', message.href, 'info')
     return
   }
-  const path = message.path.split(/[?#]/)[0]!.replace(/\/+$/, '')
-  let name = path.slice(path.lastIndexOf('/') + 1).replace(/\.html?$/, '')
+  const frames = canvas.pages.flatMap((page) =>
+    page.sections.flatMap((section) => section.items.filter((item) => item.kind === 'screen' || item.kind === 'url')),
+  )
+  const here = frames.find((item) => item.id === from)
+  const path = message.raw === undefined ? message.path : linkPath(message.raw, here?.routes?.[0])
+  if (path === null) return
+  const routed = matchRoute(
+    frames.map((item) => ({ routes: (item.routes ?? []).map(compileRoute), value: item.id })),
+    path,
+  )
+  if (routed) {
+    if (routed !== from) go(routed)
+    return
+  }
+  const bare = path.split(/[?#]/)[0]!.replace(/\/+$/, '')
+  let name = bare.slice(bare.lastIndexOf('/') + 1).replace(/\.html?$/, '')
   try {
     name = decodeURIComponent(name)
   } catch {}
-  const ids = new Set(
-    canvas.pages.flatMap((page) =>
-      page.sections.flatMap((section) =>
-        section.items.filter((item) => item.kind === 'screen' || item.kind === 'url').map((item) => item.id),
-      ),
-    ),
-  )
-  if (name && ids.has(name)) go(name)
-  else toast('Not a screen on this canvas', message.path, 'info')
+  if (name && name !== from && frames.some((item) => item.id === name)) go(name)
+  else if (!message.pushed) toast('No screen for this link', path, 'info')
 }

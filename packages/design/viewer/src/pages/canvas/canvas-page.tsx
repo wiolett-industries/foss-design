@@ -180,7 +180,7 @@ function CanvasView({ canvas, page }: { canvas: CanvasDoc; page: Page | undefine
         console.warn(`[design] go("${target}"): no such screen`)
       },
       onLink(from, message) {
-        followLink(message, canvas, (id) => this.onGo(from, id))
+        followLink(message, canvas, (id) => this.onGo(from, id), from)
       },
       onWheel(frame, message) {
         const root = frame.closest('.canvas-root') as HTMLElement | null

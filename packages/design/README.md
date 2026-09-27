@@ -21,7 +21,7 @@ Or install the `design` command globally: `npm i -g foss-design`.
 - **A design system.** `.design/system/` holds `tokens.css` (light and dark CSS variables mapped to Tailwind v4 utilities), components importable as `@system/components/…`, specimens, guidelines and assets. The viewer renders it as a style guide at `/system`.
 - **Batteries.** Every screen gets Tailwind v4 with the tokens, React, `motion`, `lucide-react`, `clsx` and `tailwind-merge`, even in projects without them; the project's own packages and `design.json` aliases work too. `import { go, useTheme, useScreen } from '@design/runtime'` links screens into prototypes.
 - **Checks for agents.** `design check --render` loads every screen in Chrome and reports errors; `design shot` writes PNGs an agent can look at.
-- **Sharing.** `design build --tar` produces a static site of the canvases and the system for any static host, or [foss-design Cloud](https://fossdesign.dev) syncs `.design` between machines and people: `design login`, `design link`, `design push`, `design pull`.
+- **Sharing.** `design build --tar` produces a static site of the canvases and the system for any static host, or [foss-design Cloud](https://fossdesign.dev) syncs `.design` between machines and people: `design login`, `design link`, `design push`, `design pull`, and `design canvases`, `url`, `history`, `rollback`, `publish`, `archive` to manage canvases there.
 
 ## Commands
 

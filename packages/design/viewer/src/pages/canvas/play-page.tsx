@@ -142,10 +142,15 @@ function Player({ canvas, itemId }: { canvas: CanvasDoc; itemId: string }) {
         const target = all.find((e) => e.item.id === idPart && (!pagePart || e.pageId === pagePart))
         if (target) navigate(playHref(canvas.id, target.item.id, target.pageId))
       } else if (message.type === 'link') {
-        followLink(message, canvas, (id) => {
-          const target = all.find((e) => e.item.id === id)
-          if (target) navigate(playHref(canvas.id, target.item.id, target.pageId))
-        })
+        followLink(
+          message,
+          canvas,
+          (id) => {
+            const target = all.find((e) => e.item.id === id)
+            if (target) navigate(playHref(canvas.id, target.item.id, target.pageId))
+          },
+          item?.id,
+        )
       }
     })
   }, [item, src, all, canvas.id, navigate, back])

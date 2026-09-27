@@ -1,10 +1,18 @@
 import { z } from 'zod'
 import { DEVICE_NAMES } from '../shared/devices'
+import { routeError } from '../shared/routes'
 
 const id = z
   .string()
   .regex(/^[a-z0-9][a-z0-9_-]*$/i, 'use letters, digits, "-" and "_", starting with a letter or digit')
 const theme = z.enum(['light', 'dark'])
+/** The app URL(s) a screen stands for; links to them open it. */
+const route = z.union([z.string(), z.array(z.string()).min(1)]).superRefine((value, ctx) => {
+  for (const pattern of Array.isArray(value) ? value : [value]) {
+    const error = routeError(pattern)
+    if (error) ctx.addIssue({ code: 'custom', message: error })
+  }
+})
 const position = { x: z.number().optional(), y: z.number().optional() }
 const size = {
   device: z.enum(DEVICE_NAMES).optional(),
@@ -48,6 +56,7 @@ export const ScreenItemSchema = z.strictObject({
   theme: theme.optional(),
   /** Inject the design system stylesheet; defaults to the canvas setting. */
   system: z.boolean().optional(),
+  route: route.optional(),
   ...size,
   ...position,
 })
@@ -58,6 +67,7 @@ export const UrlItemSchema = z.strictObject({
   url: z.string().regex(/^https?:\/\//, 'must be an http(s) URL'),
   title: z.string().optional(),
   description: z.string().optional(),
+  route: route.optional(),
   ...size,
   ...position,
 })

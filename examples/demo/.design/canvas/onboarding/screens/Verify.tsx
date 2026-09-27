@@ -1,4 +1,3 @@
-import { go } from '@design/runtime'
 import { ArrowLeft, MailCheck } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useEffect, useRef, useState } from 'react'
@@ -16,13 +15,13 @@ export default function Verify() {
     next[i] = value.slice(-1)
     setCode(next)
     if (value && i < 5) refs.current[i + 1]?.focus()
-    if (next.every(Boolean)) setTimeout(() => go('done'), 350)
+    if (next.every(Boolean)) setTimeout(() => history.pushState(null, '', '/done'), 350)
   }
   return (
     <main className="flex min-h-screen flex-col bg-bg px-6 pt-6 pb-10">
-      <button type="button" onClick={() => go('sign-up')} className="flex size-11 items-center justify-center rounded-control text-ink-2">
+      <a href="/sign-up" aria-label="Back" className="flex size-11 items-center justify-center rounded-control text-ink-2">
         <ArrowLeft size={20} />
-      </button>
+      </a>
       <motion.div
         initial={{ scale: 0.8, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}

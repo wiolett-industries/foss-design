@@ -38,7 +38,7 @@ A page holds either `sections` (automatic layout) or `items` (free layout), neve
 
 | Key | Type | Meaning |
 | --- | --- | --- |
-| `id` | id, required | Unique within the canvas. Used in URLs and in `go('<page>/<screen>')`. |
+| `id` | id, required | Unique within the canvas. Used in viewer URLs. |
 | `title` | string, required | Shown in the page switcher. |
 | `description` | string | Shown with the page. |
 | `sections` | array | Rows laid out top to bottom. |
@@ -77,7 +77,7 @@ An item without `type` is a screen. Every item may carry an `id`; without one, i
 ### Screen
 
 ```json
-{ "src": "screens/SignUp.tsx", "device": "phone" }
+{ "src": "screens/SignUp.tsx", "device": "phone", "route": "/sign-up" }
 { "id": "sign-up-error", "src": "screens/SignUp.tsx", "device": "phone", "title": "Sign up, error", "props": { "error": "This email is already registered" } }
 { "src": "screens/landing/index.html", "device": "desktop", "height": "auto" }
 ```
@@ -95,6 +95,7 @@ An item without `type` is a screen. Every item may carry an `id`; without one, i
 | `props` | object | Passed to the screen component as React props. |
 | `theme` | `"light"` \| `"dark"` | Pin this screen's theme; the viewer toggle no longer changes it. |
 | `system` | boolean | Override the canvas `system` setting for this screen. |
+| `route` | path pattern or array of them | The app URL this screen shows, such as `"/settings"` or `["/", "/dashboard"]`. A link in any screen of the canvas (`href="/settings"`) opens the screen whose route matches it. See [Routes](#routes). |
 | `x`, `y` | number | Free-layout position. |
 
 When only `width` or only `height` is given, the other side comes from the `desktop` preset.
@@ -112,9 +113,10 @@ A live page served by something else, such as the app's own dev server.
 | `url` | http(s) URL, required | Loaded as-is in the frame. |
 | `id`, `title`, `description` | | As for screens. Title defaults to the URL. |
 | `device`, `width`, `height` | | As for screens; `"auto"` is not measured for URL items. |
+| `route` | | As for screens: links to it open this item. |
 | `x`, `y` | number | Free-layout position. |
 
-The page must allow being framed. The design system is not injected and `go()` is not available inside it.
+The page must allow being framed. The design system is not injected, and its links are its own.
 
 ### Note
 
@@ -175,9 +177,9 @@ Frames never scale their content: a 1440 px design in a 390 px frame is cut off,
         {
           "title": "Guest checkout",
           "items": [
-            { "src": "screens/Cart.tsx", "device": "desktop" },
-            { "src": "screens/Shipping.tsx", "device": "desktop" },
-            { "src": "screens/Payment.tsx", "device": "desktop" },
+            { "src": "screens/Cart.tsx", "device": "desktop", "route": "/cart" },
+            { "src": "screens/Shipping.tsx", "device": "desktop", "route": "/checkout/shipping" },
+            { "src": "screens/Payment.tsx", "device": "desktop", "route": "/checkout/payment" },
             { "type": "note", "text": "Payment reuses the saved address when the email is known." }
           ]
         },
@@ -207,7 +209,19 @@ Frames never scale their content: a 1440 px design in a 390 px frame is cut off,
 }
 ```
 
-`go('payment')` from `Cart.tsx` moves to the Payment screen; `go('states/cart-empty')` moves to the other page.
+`<a href="/checkout/payment">` in any screen opens Payment. The phone and state variants have no route: links land on the main screens, and the variants are reached from the canvas.
+
+## Routes
+
+A screen's `route` is the URL it shows in the real app, so screens keep the links the app has (`<a href="/orders/42">`, a router's `navigate('/orders/42')`) and the viewer turns them into moves between screens: on the canvas it brings the target into view, in play mode and on a phone it opens it.
+
+- A pattern starts with `/`. `:name` matches one segment (`/orders/:id`), `:name?` an optional one (`/databases/:id/:tab?`), and a trailing `*` the rest of the path (`/docs/*`).
+- The most specific route wins: literal segments beat parameters, and parameters beat `*`. On a tie the screen listed first wins; two screens with the same pattern get a warning.
+- A relative `href` resolves against the route of the screen it is in. Query and hash are ignored when matching.
+- A path no route matches, but whose last segment is a screen id (`/sign-up` → `sign-up`), still opens that screen.
+- Links to other sites open in a new tab; `#section` links scroll inside the screen; anything else stays on the screen with a note, and `design check --render` lists it as a warning.
+
+Variants of one screen (states, themes, devices) usually carry no route: links go to the main screen.
 
 ## Viewer
 

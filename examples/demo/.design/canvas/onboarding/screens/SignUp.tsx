@@ -1,4 +1,3 @@
-import { go } from '@design/runtime'
 import { AlertCircle, ArrowLeft, Eye, EyeOff } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useState } from 'react'
@@ -12,13 +11,13 @@ export default function SignUp({ state }: { state?: 'error' }) {
   const passwordOk = password.length >= 8
   const submit = () => {
     setTried(true)
-    if (emailOk && passwordOk) go('verify')
+    if (emailOk && passwordOk) history.pushState(null, '', '/verify')
   }
   return (
     <main className="flex min-h-screen flex-col bg-bg px-6 pt-6 pb-10">
-      <button type="button" onClick={() => go('welcome')} className="flex size-11 items-center justify-center rounded-control text-ink-2">
+      <a href="/" aria-label="Back" className="flex size-11 items-center justify-center rounded-control text-ink-2">
         <ArrowLeft size={20} />
-      </button>
+      </a>
       <h1 className="mt-6 text-title font-semibold text-ink">Create your account</h1>
       <p className="mt-1 text-body text-muted">Use your work email so your team can find you.</p>
       <form

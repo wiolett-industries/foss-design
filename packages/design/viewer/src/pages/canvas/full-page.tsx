@@ -72,7 +72,7 @@ export function FullPage({ canvasId, itemId }: { canvasId: string; itemId: strin
         const id = message.target.includes('/') ? message.target.split('/')[1]! : message.target
         if (items.some((entry) => entry.id === id)) navigate(fullHref(canvasId, id, theme), { replace: true })
       } else if (message.type === 'link' && canvas) {
-        followLink(message, canvas, (id) => navigate(fullHref(canvasId, id, theme), { replace: true }))
+        followLink(message, canvas, (id) => navigate(fullHref(canvasId, id, theme), { replace: true }), itemId)
       }
     })
   }, [url, item?.kind])

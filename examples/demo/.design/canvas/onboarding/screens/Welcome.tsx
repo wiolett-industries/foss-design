@@ -1,4 +1,3 @@
-import { go } from '@design/runtime'
 import { ArrowRight, Sparkles } from 'lucide-react'
 import { motion } from 'motion/react'
 
@@ -45,14 +44,13 @@ export default function Welcome() {
         >
           Plans, files and decisions stay together, so nobody has to ask twice.
         </motion.p>
-        <motion.button
-          type="button"
+        <motion.a
+          href="/sign-up"
           whileTap={{ scale: 0.98 }}
-          onClick={() => go('sign-up')}
-          className="mt-4 flex h-12 items-center justify-center gap-2 rounded-control bg-accent text-body font-medium text-accent-ink"
+          className="mt-4 flex h-12 items-center justify-center gap-2 rounded-control bg-accent text-body font-medium text-accent-ink no-underline"
         >
           Get started <ArrowRight size={18} />
-        </motion.button>
+        </motion.a>
         <button type="button" className="h-11 text-body text-ink-2">
           I already have an account
         </button>

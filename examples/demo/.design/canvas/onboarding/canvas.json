@@ -8,12 +8,12 @@
       "sections": [
         {
           "title": "Sign up",
-          "description": "Four steps from the welcome screen to the first session. Click a screen to use it; **Continue** moves to the next one.",
+          "description": "Four steps from the welcome screen to the first session. Click a screen to use it; **Continue** moves to the next one: each screen has the app URL it shows as its `route`, and links go there.",
           "items": [
-            { "src": "screens/Welcome.tsx", "device": "phone" },
-            { "src": "screens/SignUp.tsx", "device": "phone", "title": "Sign up" },
-            { "src": "screens/Verify.tsx", "device": "phone", "title": "Verify email" },
-            { "src": "screens/Done.tsx", "device": "phone", "title": "All set" },
+            { "src": "screens/Welcome.tsx", "device": "phone", "route": "/" },
+            { "src": "screens/SignUp.tsx", "device": "phone", "title": "Sign up", "route": "/sign-up" },
+            { "src": "screens/Verify.tsx", "device": "phone", "title": "Verify email", "route": "/verify" },
+            { "src": "screens/Done.tsx", "device": "phone", "title": "All set", "route": "/done" },
             {
               "type": "note",
               "text": "**Open question:** do we ask for a name on step 2, or after the first session? Fewer fields → +8% completion in the last test."
@@ -36,7 +36,7 @@
         {
           "title": "First session",
           "items": [
-            { "src": "screens/Dashboard.tsx", "device": "desktop" },
+            { "src": "screens/Dashboard.tsx", "device": "desktop", "route": "/dashboard" },
             { "src": "screens/landing/index.html", "width": 1280, "height": "auto", "title": "Landing page" }
           ]
         }

@@ -42,6 +42,9 @@ export function listCanvasIds(paths: DesignPaths): string[] {
     .sort()
 }
 
+const routesOf = (route: string | string[] | undefined) =>
+  route === undefined ? undefined : Array.isArray(route) ? route : [route]
+
 function frameOf(input: { device?: keyof typeof DEVICES; width?: number; height?: number | 'auto' }): FrameSize {
   const custom = input.width !== undefined || input.height !== undefined
   const device = input.device ?? (custom ? undefined : DEFAULT_DEVICE)
@@ -169,6 +172,7 @@ export function loadCanvas(
         url: format === 'module' ? urls.screen(canvasId, id) : urls.html(relToDesign(paths, abs), canvasId, id),
         frame,
         theme,
+        routes: routesOf(item.route),
         missing: missing || undefined,
         rev,
         snapshots: snap?.urls,
@@ -186,6 +190,7 @@ export function loadCanvas(
         x: item.x,
         y: item.y,
         url: item.url,
+        routes: routesOf(item.route),
         frame: frameOf(item),
       }
     }
@@ -282,7 +287,65 @@ export function loadCanvas(
     doc.pages.push(out)
   })
 
+  checkNavigation(doc, screens, issues, fileRel, (file) => relToRoot(paths, file))
   return { doc, screens }
+}
+
+/** `go` imported from the runtime: removed in 0.5 in favour of links to screen routes. */
+const GO_IMPORT = /import\s*\{[^}]*\bgo\b[^}]*\}\s*from\s*['"]@design\/runtime['"]/
+const GO_USE = /\bgo\s*\(/g
+
+export const GO_REMOVED =
+  'go() is no longer supported: link to the screen instead (<a href="/verify">, or history.pushState in code) and give that screen a "route" in canvas.json'
+
+/** Lines of a screen file that use the removed `go()`: its calls, or the import when nothing calls it. */
+export function legacyGoLines(file: string): number[] {
+  let source: string
+  try {
+    source = fs.readFileSync(file, 'utf8')
+  } catch {
+    return []
+  }
+  const imported = GO_IMPORT.exec(source)
+  if (!imported) return []
+  const lineOf = (index: number) => source.slice(0, index).split('\n').length
+  const calls = [...source.matchAll(GO_USE)]
+    .map((match) => lineOf(match.index))
+    .filter((line) => line !== lineOf(imported.index))
+  return calls.length ? [...new Set(calls)] : [lineOf(imported.index)]
+}
+
+/** Routes two screens claim (links open the first), and screens still using the removed `go()`. */
+function checkNavigation(
+  doc: CanvasDoc,
+  screens: ScreenSource[],
+  issues: Issue[],
+  canvasFile: string,
+  rel: (file: string) => string,
+) {
+  const frames = doc.pages.flatMap((page) =>
+    page.sections.flatMap((section) =>
+      section.items.filter((item) => item.kind === 'screen' || item.kind === 'url').map((item) => ({ page, item })),
+    ),
+  )
+  const claimed = new Map<string, string>()
+  for (const { item } of frames) {
+    for (const route of item.routes ?? []) {
+      const first = claimed.get(route)
+      if (first === undefined) claimed.set(route, item.id)
+      else if (first !== item.id)
+        issues.push({
+          severity: 'warning',
+          file: canvasFile,
+          message: `route "${route}" is on both "${first}" and "${item.id}"; links open "${first}"`,
+        })
+    }
+  }
+  for (const file of new Set(screens.map((screen) => screen.file))) {
+    for (const line of legacyGoLines(file)) {
+      issues.push({ severity: 'error', file: rel(file), at: `line ${line}`, message: GO_REMOVED })
+    }
+  }
 }
 
 export function summarize(canvas: ResolvedCanvas): CanvasSummary {

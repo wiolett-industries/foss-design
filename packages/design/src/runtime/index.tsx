@@ -78,12 +78,14 @@ export function useTheme(): Theme {
 }
 
 /**
- * Move to another screen: on the canvas the viewer brings it into view, in
- * play mode it opens it. `target` is a screen id, or `page/id` on another page.
+ * Removed in 0.5: screens move like the app does, through links. Give the target screen a
+ * `route` in canvas.json and link to it (`<a href="/verify">`, or `history.pushState` in code).
+ * Kept only to fail with that advice instead of a missing export.
  */
-export function go(target: string) {
-  if (embedded) post({ type: 'go', target })
-  else console.info(`[design] go("${target}") works inside the canvas viewer`)
+export function go(target: string): never {
+  const message = `go("${target}") is no longer supported: link to the screen instead (<a href="/…">, or history.pushState in code) and give it a "route" in canvas.json`
+  recordError(message)
+  throw new Error(message)
 }
 
 /** Where this screen sits and the props canvas.json gave it. */
@@ -203,16 +205,20 @@ async function takeSnapshot() {
  * A screen's links and forms would take the frame to another page, and the frame's origin
  * serves screens only: the viewer would show an error page in the screen's place. Once the
  * screen's own handlers had their say (a router that handled the click prevents the default),
- * the frame stays put and the viewer hears where the link pointed. Links within the page
- * (`#section`) still scroll.
+ * the frame stays put and the viewer hears where the link pointed, and opens the screen whose
+ * `route` matches. Links within the page (`#section`) still scroll. A router in the screen moves
+ * with `history.pushState`; the viewer hears those too and opens another screen when one has
+ * that route, and otherwise the screen's router carries on.
  */
 function keepLinksInFrame() {
-  const report = (target: URL, form: boolean) =>
+  const report = (target: URL, form: boolean, raw: string, pushed = false) =>
     post({
       type: 'link',
       href: target.href,
       path: target.origin === location.origin ? target.pathname + target.search + target.hash : null,
       form,
+      raw,
+      pushed,
     })
   const onClick = (event: MouseEvent) => {
     if (event.defaultPrevented || event.button > 1) return
@@ -224,7 +230,7 @@ function keepLinksInFrame() {
       target.origin === location.origin && target.pathname === location.pathname && target.search === location.search
     if (samePage && target.hash) return
     event.preventDefault()
-    report(target, false)
+    report(target, false, link.getAttribute('href') ?? '')
   }
   window.addEventListener('click', onClick)
   window.addEventListener('auxclick', onClick)
@@ -233,8 +239,40 @@ function keepLinksInFrame() {
     // method="dialog" only closes its dialog.
     if (event.defaultPrevented || form.method === 'dialog') return
     event.preventDefault()
-    report(new URL(form.getAttribute('action') || location.href, location.href), true)
+    const action = form.getAttribute('action') ?? ''
+    report(new URL(action || location.href, location.href), true, action)
   })
+  // Where the Navigation API exists it also catches what no listener sees, such as
+  // `location.href = "/verify"`: a document navigation away from the screen.
+  const navigation = (window as { navigation?: EventTarget }).navigation
+  navigation?.addEventListener('navigate', (event) => {
+    const nav = event as Event & {
+      destination: { url: string; sameDocument: boolean }
+      cancelable: boolean
+      downloadRequest: string | null
+      navigationType: string
+    }
+    // Same-document moves (pushState, #hash) are the screen's own; reloads come from the viewer.
+    if (!nav.cancelable || nav.destination.sameDocument || nav.downloadRequest !== null) return
+    if (nav.navigationType === 'reload') return
+    const target = new URL(nav.destination.url)
+    if (target.pathname === location.pathname && target.search === location.search) return
+    event.preventDefault()
+    report(
+      target,
+      false,
+      target.origin === location.origin ? target.pathname + target.search + target.hash : target.href,
+    )
+  })
+  for (const name of ['pushState', 'replaceState'] as const) {
+    const original = history[name].bind(history)
+    history[name] = (data: unknown, unused: string, url?: string | URL | null) => {
+      original(data, unused, url)
+      if (url === undefined || url === null) return
+      const raw = String(url)
+      report(new URL(raw, location.href), false, raw, true)
+    }
+  }
 }
 
 let booted = false

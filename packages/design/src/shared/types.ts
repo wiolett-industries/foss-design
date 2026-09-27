@@ -54,6 +54,8 @@ interface ItemBase {
   id: string
   title: string
   description?: string
+  /** Screens and url items: the app URL patterns they stand for (`/databases/:id`). */
+  routes?: string[]
   /** Free-layout position on the page, in canvas pixels. */
   x?: number
   y?: number
@@ -288,7 +290,18 @@ export type RuntimeMessage =
    * A link or form in the screen would have taken the frame to another page, which the frame's
    * origin does not serve; the runtime kept the frame put. `path` is set for its own origin.
    */
-  | { source: 'design-runtime'; key: string; type: 'link'; href: string; path: string | null; form: boolean }
+  | {
+      source: 'design-runtime'
+      key: string
+      type: 'link'
+      href: string
+      path: string | null
+      form: boolean
+      /** The `href` as written (0.4.3+), resolved by the viewer against the screen's route. */
+      raw?: string
+      /** Sent by the screen's own `history.pushState`, not a click: the screen already moved. */
+      pushed?: boolean
+    }
   | {
       source: 'design-runtime'
       key: string

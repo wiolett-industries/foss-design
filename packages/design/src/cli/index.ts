@@ -2,6 +2,7 @@ import path from 'node:path'
 import { parseArgs } from 'node:util'
 import { designPaths, findProjectRoot, packageVersion } from '../core/paths'
 import { runBuild } from './commands/build'
+import { runArchive, runCanvases, runHistory, runMe, runPublish, runRollback, runUrl } from './commands/canvases'
 import { runCheck } from './commands/check'
 import { runLink, runLogin, runLogout } from './commands/cloud'
 import { runPreview, runStop } from './commands/preview'
@@ -19,6 +20,8 @@ ${bold('Project')}
   init [--name <name>] [--no-gitignore]      Create .design and add it to .gitignore
   system init [--name <name>] [--empty]      Scaffold .design/system: tokens, a guideline, a component
   new <canvas> [--title <title>] [--empty]   Scaffold .design/canvas/<canvas>
+  canvases [--json]                          Every canvas: pages and screens; with a cloud link also its
+                                             revision, sync state, web link and public link
 
 ${bold('Preview')}
   preview [--open [path]] [--port <n>]       Start the viewer in the background on a free port (or reuse
@@ -31,8 +34,9 @@ ${bold('Preview')}
                                              changes, remote ahead, conflict or archived
 
 ${bold('Verify')}
-  check [canvas…] [--render] [--json]        Validate canvas.json and the system; --render loads every
-                                             screen in Chrome and reports runtime errors
+  check [canvas…] [--render] [--json]        Validate canvas.json and the system (go() is an error);
+                                             --render loads every screen in Chrome and reports runtime
+                                             errors and links that lead to no screen
   shot <canvas>[/<screen>] [--page <id>]     Screenshot screens with Chrome (PNG paths are printed);
        [--theme light|dark] [--out <dir>]    @system or @system/<id> shoots the design system specimens
        [--overview]
@@ -44,15 +48,27 @@ ${bold('Cloud')}  ${dim('units: system (design.json + system/) and canvas/<id>; 
   login                                      Sign in to foss-design Cloud; prints a link to open (the
                                              code is in the link) and waits for approval
   logout                                     Forget this machine's token for the cloud
+  me [--json]                                The signed-in account: plan, storage, projects, canvases,
+                                             pushes, and the project .design is linked to
   link [<project>] [--new <name>]            No args: list your projects. Link .design to a cloud project
                                              (linking to another project replaces the link)
   push [canvas…] [--json]                    Build and upload what changed here (or the named units); a
        [--resolved <unit>]                   system change pushes every active canvas with it. Stops if
                                              the cloud is ahead; --resolved marks a merged conflict.
-                                             Prints the web link of every pushed canvas
+                                             Prints the web link of every pushed canvas; refuses screens
+                                             that still call go()
   pull [canvas…] [--json]                    Take cloud changes into .design; a unit changed on both sides
        [--theirs <unit>]                     goes to .design/.cache/cloud/incoming/<unit> (exit 2);
                                              --theirs takes the cloud version and drops local changes
+  url <canvas> [--json]                      The canvas in the web app, and its public link if published
+  history <canvas|system> [--json]           Stored revisions, newest first: when, who, screens, size
+  rollback <canvas> <rev>                    Make an old revision current again in the cloud (a new
+                                             revision), then pull it here
+  publish <canvas>                           Give the canvas a public link anyone can open (owner only)
+  unpublish <canvas>                         Turn the public link off
+  archive <canvas>                           Archive the canvas in the cloud: out of the list and pushes,
+                                             history kept
+  unarchive <canvas>                         Bring an archived canvas back
 
 ${bold('Options')}
   --root <dir>   Project folder (default: the nearest folder with .design, or the current one)
@@ -159,6 +175,27 @@ async function main(argv: string[]) {
     case 'link':
       if (rest.length > 1) throw new CliError('Usage: design link [<project>] [--new <name>]')
       return runLink(projectPaths(values.root), rest[0], { newName: values.new })
+    case 'me': {
+      let paths: ReturnType<typeof projectPaths> | null = null
+      try {
+        paths = projectPaths(values.root)
+      } catch {}
+      return runMe(paths, { json: !!values.json })
+    }
+    case 'canvases':
+      return runCanvases(projectPaths(values.root), { json: !!values.json })
+    case 'url':
+      return runUrl(projectPaths(values.root), rest[0], { json: !!values.json })
+    case 'history':
+      return runHistory(projectPaths(values.root), rest[0], { json: !!values.json })
+    case 'rollback':
+      return runRollback(projectPaths(values.root), rest[0], rest[1])
+    case 'publish':
+    case 'unpublish':
+      return runPublish(projectPaths(values.root), rest[0], command === 'publish')
+    case 'archive':
+    case 'unarchive':
+      return runArchive(projectPaths(values.root), rest[0], command === 'archive')
     case 'push':
       return runPush(projectPaths(values.root), rest, { resolved: values.resolved ?? [], json: !!values.json })
     case 'pull':
