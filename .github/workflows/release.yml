@@ -61,6 +61,8 @@ jobs:
         run: |
           flags=(--title "$GITHUB_REF_NAME" --generate-notes --verify-tag)
           if [[ "$GITHUB_REF_NAME" == *-* ]]; then flags+=(--prerelease); fi
+          # The tarball as published: the smoke test packs its own and cleans up after itself.
+          (cd packages/design && npm pack --pack-destination "$RUNNER_TEMP")
           gh release create "$GITHUB_REF_NAME" "${flags[@]}" "$RUNNER_TEMP"/foss-design-*.tgz
         env:
           GH_TOKEN: ${{ github.token }}
