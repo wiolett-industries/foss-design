@@ -418,7 +418,7 @@ export function Viewport({ layout, theme, store, camera, events, capture, apiRef
     <div
       ref={rootRef}
       className={cn(
-        'canvas-root relative h-full w-full touch-none overflow-hidden select-none',
+        'canvas-root relative h-full w-full touch-none overflow-clip select-none animate-[q-fade-in_160ms_ease-out]',
         panning && 'canvas-panning cursor-grabbing',
       )}
       onPointerDown={onPointerDown}

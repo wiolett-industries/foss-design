@@ -1,5 +1,5 @@
 import type { SystemDoc } from '@shared/types'
-import { Route, Switch } from 'wouter'
+import { Route, Switch, useLocation } from 'wouter'
 import { ApiError, useProject, useSystem } from '../../lib/api'
 import { Notice } from '../../ui/page'
 import { Mono } from '../../ui/text'
@@ -16,6 +16,7 @@ import { ShapePage } from './shape'
 import { TypographyPage } from './typography'
 
 function Layout({ system }: { system: SystemDoc }) {
+  const [location] = useLocation()
   // The vertical padding lives inside the columns, not on <main>: the sidebar sticks right
   // under the 52px bar and its scroll area runs to the bottom edge of the window.
   return (
@@ -27,7 +28,8 @@ function Layout({ system }: { system: SystemDoc }) {
         <aside className="sticky top-[52px] flex max-h-[calc(100dvh-52px)] flex-col overflow-y-auto pt-6 pb-4 max-lg:static max-lg:max-h-none max-lg:overflow-visible max-lg:pb-0 max-md:pt-4">
           <SystemNav system={system} />
         </aside>
-        <div className="flex min-w-0 flex-col gap-5 pt-6 pb-7">
+        {/* Keyed by the address: each section fades in like a page does. */}
+        <div key={location} className="flex min-w-0 animate-[q-fade-in_160ms_ease-out] flex-col gap-5 pt-6 pb-7">
           <Switch>
             <Route path="/system">
               <OverviewPage system={system} />

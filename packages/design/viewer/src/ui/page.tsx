@@ -1,5 +1,6 @@
+import { motion } from 'motion/react'
 import type { ReactNode } from 'react'
-import { Link } from 'wouter'
+import { Link, useLocation } from 'wouter'
 import { cn } from '../lib/cn'
 import { Panel } from './panel'
 
@@ -64,23 +65,37 @@ export interface NavItem {
 }
 
 export function SubNav({ items, label }: { items: NavItem[]; label: string }) {
+  const [location] = useLocation()
   return (
     <nav aria-label={label} className="flex flex-col gap-0.5">
-      {items.map((item) => (
-        <Link
-          key={item.to}
-          href={item.to}
-          className={(active: boolean) =>
-            cn(
-              'flex h-8 items-center gap-2 whitespace-nowrap rounded-[6px] px-3 text-[13.5px] no-underline transition-colors focus-visible:outline-offset-[-2px]',
-              active ? 'bg-soft2 font-medium text-ink' : 'text-ink2 hover:bg-soft2',
-            )
-          }
-        >
-          <span className="min-w-0 truncate">{item.label}</span>
-          {item.hint ? <span className="ml-auto text-[12px] font-normal text-muted">{item.hint}</span> : null}
-        </Link>
-      ))}
+      {items.map((item) => {
+        const active = location === item.to
+        return (
+          <Link
+            key={item.to}
+            href={item.to}
+            aria-current={active ? 'page' : undefined}
+            className={cn(
+              'relative flex h-8 items-center gap-2 whitespace-nowrap rounded-[6px] px-3 text-[13.5px] no-underline transition-colors focus-visible:outline-offset-[-2px]',
+              active ? 'font-medium text-ink' : 'text-ink2 hover:bg-soft2',
+            )}
+          >
+            {/* The highlight moves to the new item, under its label, like the tabs' underline. */}
+            {active ? (
+              <motion.span
+                layoutId="sub-nav-active"
+                aria-hidden
+                className="absolute inset-0 z-0 rounded-[6px] bg-soft2"
+                transition={{ type: 'spring', stiffness: 520, damping: 42 }}
+              />
+            ) : null}
+            <span className="relative z-[1] min-w-0 truncate">{item.label}</span>
+            {item.hint ? (
+              <span className="relative z-[1] ml-auto text-[12px] font-normal text-muted">{item.hint}</span>
+            ) : null}
+          </Link>
+        )
+      })}
     </nav>
   )
 }

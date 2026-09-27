@@ -260,7 +260,8 @@ function Player({ canvas, itemId }: { canvas: CanvasDoc; itemId: string }) {
             style={{ width: fit === 'actual' ? width + 48 : undefined }}
           >
             <div
-              className="shrink-0 overflow-hidden bg-surface"
+              key={item.id}
+              className="shrink-0 animate-[q-fade-in_160ms_ease-out] overflow-clip bg-surface"
               style={{
                 width: width * scale,
                 height: height * scale,

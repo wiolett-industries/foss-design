@@ -134,7 +134,7 @@ export const FrameItem = memo(function FrameItem({
   return (
     <div
       data-item={item.id}
-      className="absolute overflow-hidden bg-surface"
+      className="absolute overflow-clip bg-surface"
       style={{ left: x, top: y, width: w, height: h, boxShadow: 'var(--shadow-frame), 0 0 0 1px var(--rule)' }}
     >
       {(!ready || asleep) && snapshot ? (
@@ -232,7 +232,7 @@ export const ImageView = memo(function ImageView({
   return (
     <div
       data-item={item.id}
-      className="absolute overflow-hidden rounded-[6px] bg-surface"
+      className="absolute overflow-clip rounded-[6px] bg-surface"
       style={{ left: x, top: y, width: w, height: h, boxShadow: '0 0 0 1px var(--rule)' }}
     >
       {item.missing ? (
