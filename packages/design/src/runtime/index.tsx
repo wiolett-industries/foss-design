@@ -340,6 +340,12 @@ export function boot() {
   if (booted) return
   booted = true
   applyTheme(theme)
+  // In the viewer a frame's edges do not rubber-band; `:where` leaves the screen's own CSS in charge.
+  if (embedded) {
+    const style = document.createElement('style')
+    style.textContent = ':where(html, body) { overscroll-behavior: none; }'
+    document.head.prepend(style)
+  }
 
   let inspector: FrameInspector | null = null
   window.addEventListener('message', (event: MessageEvent) => {
@@ -424,8 +430,13 @@ export function boot() {
   }
   const whenBodyReady = () => {
     if (embedded) watchSize()
-    const fonts = document.fonts?.ready ?? Promise.resolve()
-    void fonts.then(() => requestAnimationFrame(() => requestAnimationFrame(ready)))
+    // The page's other module scripts (a screen's whole app) run before `load`, so a hold one of
+    // them takes while it starts still counts.
+    const loaded =
+      document.readyState === 'complete'
+        ? Promise.resolve()
+        : new Promise<void>((resolve) => window.addEventListener('load', () => resolve(), { once: true }))
+    void loaded.then(() => document.fonts?.ready).then(() => requestAnimationFrame(() => requestAnimationFrame(ready)))
   }
   if (document.body) whenBodyReady()
   else document.addEventListener('DOMContentLoaded', whenBodyReady, { once: true })

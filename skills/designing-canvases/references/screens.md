@@ -97,10 +97,16 @@ A frame is ready once it has painted: the viewer then shows it, `design check --
 
 ```tsx
 const release = holdReady()
-await startApp(root)
-await openDialog()
-release()
+try {
+  const { startApp } = await import('./app') // the heavy part loads after the hold is taken
+  await startApp(root)
+  await openDialog()
+} finally {
+  release()
+}
 ```
+
+Take the hold first and load a whole app with `await import()` after it, so nothing slow runs before the frame knows to wait.
 
 `design check --render` waits up to 20 seconds for the release and reports a hold never released. Until the frame is ready, `history.pushState` and `replaceState` stay in the frame: a screen can put the app at its route and open a dialog without the viewer moving to another screen. A hot reload that reloads the whole frame brings back the screen, not the address the app moved to. Once someone clicks or types in a frame, it takes no snapshot until it loads again, so the snapshot never shows a state a person or a test left behind. Clicks a screen makes itself (user-event opening a dialog) do not count.
 

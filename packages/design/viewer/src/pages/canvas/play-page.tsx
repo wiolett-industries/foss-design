@@ -247,7 +247,7 @@ function Player({ canvas, itemId }: { canvas: CanvasDoc; itemId: string }) {
       <div className="flex min-h-0 grow basis-0">
         <div
           ref={stage}
-          className={`canvas-dots relative min-w-0 grow ${fit === 'actual' ? 'overflow-auto' : 'overflow-hidden'}`}
+          className={`canvas-dots relative min-w-0 grow overscroll-none ${fit === 'actual' ? 'overflow-auto' : 'overflow-hidden'}`}
         >
           {errors.length ? (
             <div className="absolute inset-x-0 top-0 z-10 flex items-start gap-2 border-b border-rule bg-danger-soft px-4 py-2 font-mono text-[12px] whitespace-pre-wrap text-danger-text">

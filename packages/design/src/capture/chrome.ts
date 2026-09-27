@@ -1,5 +1,5 @@
 import fs from 'node:fs'
-import type { Browser, Page } from 'playwright-core'
+import type { Browser, Frame, Page } from 'playwright-core'
 
 const CANDIDATES: Record<string, string[]> = {
   darwin: [
@@ -76,14 +76,22 @@ export async function openFrame(
     record(text)
   })
   let ready = false
+  // A frame that reloads itself never holds a state. Once is how Vite takes in dependencies it just
+  // bundled, so that load is given a second try; a frame that reloads again is reported.
+  let reloads = 0
+  const onNavigate = (frame: Frame) => {
+    if (frame === page.mainFrame()) reloads++
+  }
   for (let attempt = 0; attempt < 2; attempt++) {
     errors = []
+    reloads = 0
     // Pages without the runtime (url items) never signal; for them loading is ready enough.
     ready = options.waitForReady === false
     const turnedAway = new Promise<'outdated'>((resolve) => {
       outdated = () => resolve('outdated')
     })
     await page.goto(url, { waitUntil: 'load', timeout: options.timeoutMs ?? 30000 })
+    page.on('framenavigated', onNavigate)
     if (!ready) {
       const signal = page
         .waitForFunction(() => (window as { __DESIGN_READY__?: boolean }).__DESIGN_READY__ === true, null, {
@@ -93,13 +101,15 @@ export async function openFrame(
       signal.catch(() => {})
       ready = (await Promise.race([signal, turnedAway]).catch(() => null)) === 'ready'
     }
-    if (!errors.some((error) => OUTDATED_DEP.test(error))) break
+    // Let entrance animations finish before anyone looks.
+    if (ready || options.waitForReady === false) await page.waitForTimeout(options.settleMs ?? 700)
+    page.off('framenavigated', onNavigate)
+    if (!reloads && !errors.some((error) => OUTDATED_DEP.test(error))) break
   }
+  if (reloads) errors.push(`the page reloaded itself ${reloads === 1 ? 'once' : `${reloads} times`} while it loaded`)
   const held = ready
     ? 0
     : await page.evaluate(() => (window as { __DESIGN_HOLDS__?: number }).__DESIGN_HOLDS__ ?? 0).catch(() => 0)
-  // Let entrance animations finish before anyone looks.
-  await page.waitForTimeout(options.settleMs ?? 700)
   const runtimeErrors = await page
     .evaluate(() => (window as { __DESIGN_ERRORS__?: string[] }).__DESIGN_ERRORS__ ?? [])
     .catch(() => [] as string[])

@@ -5,6 +5,7 @@ import { runBuild } from './commands/build'
 import { runArchive, runCanvases, runHistory, runMe, runPublish, runRollback, runUrl } from './commands/canvases'
 import { runCheck } from './commands/check'
 import { runLink, runLogin, runLogout } from './commands/cloud'
+import { runImport } from './commands/import'
 import { runPreview, runStop } from './commands/preview'
 import { runInit, runNew, runSystemInit } from './commands/scaffold'
 import { runShot } from './commands/shot'
@@ -20,6 +21,8 @@ ${bold('Project')}
   init [--name <name>] [--no-gitignore]      Create .design and add it to .gitignore
   system init [--name <name>] [--empty]      Scaffold .design/system: tokens, a guideline, a component
   new <canvas> [--title <title>] [--empty]   Scaffold .design/canvas/<canvas>
+  import <folder> [--canvas <id>]            Turn an exported Claude Design project (canvas.json and
+         [--title <title>]                   *.dc.html) into a canvas of React screens, once
   canvases [--json]                          Every canvas: pages and screens; with a cloud link also its
                                              revision, sync state, web link and public link
 
@@ -98,6 +101,7 @@ async function main(argv: string[]) {
       root: { type: 'string' },
       name: { type: 'string' },
       title: { type: 'string' },
+      canvas: { type: 'string' },
       'no-gitignore': { type: 'boolean' },
       empty: { type: 'boolean' },
       open: { type: 'boolean' },
@@ -140,6 +144,10 @@ async function main(argv: string[]) {
     case 'new': {
       if (!rest[0]) throw new CliError('Usage: design new <canvas> [--title <title>]')
       return runNew(projectPaths(values.root).root, rest[0], { title: values.title, empty: !!values.empty })
+    }
+    case 'import': {
+      if (!rest[0]) throw new CliError('Usage: design import <folder> [--canvas <id>] [--title <title>]')
+      return runImport(projectPaths(values.root), rest[0], { canvas: values.canvas, title: values.title })
     }
     case 'preview': {
       // `--open` may be followed by a viewer path such as /c/onboarding.

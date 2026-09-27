@@ -52,7 +52,7 @@ async function renderFrames(jobs: FrameJob[]): Promise<FrameResult[]> {
         report = await openFrame(page, job.url, { waitForReady: job.waitForReady, settleMs: 300 })
         links = await page
           .evaluate(() =>
-            [...document.querySelectorAll('a[href], area[href]')].map((link) => ({
+            [...document.querySelectorAll('a[href]:not([download]), area[href]:not([download])')].map((link) => ({
               href: link.getAttribute('href') ?? '',
               text: (link.textContent || link.getAttribute('aria-label') || '')
                 .replace(/\s+/g, ' ')

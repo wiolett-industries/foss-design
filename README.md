@@ -103,6 +103,7 @@ The complete formats are in the skills: [canvas.json](skills/designing-canvases/
 | `design init [--name <name>] [--no-gitignore]` | Create `.design` and add it to `.gitignore`. |
 | `design system init [--name <name>] [--empty]` | Scaffold `.design/system`: tokens, a guideline, a component and its specimen. |
 | `design new <canvas> [--title <title>] [--empty]` | Scaffold `.design/canvas/<canvas>`. |
+| `design import <folder> [--canvas <id>] [--title <title>]` | Turn an exported Claude Design project (`canvas.json` and `*.dc.html`) into a canvas, once: every template becomes a React screen (`.jsx`) with its logic and state, boards keep their pages and positions, links between boards become routes, a `theme` prop follows the viewer's switch. Files the export lacks (`/_blob/…` uploads) are listed. |
 | `design canvases [--json]` | List the canvases with pages and screens; when linked, also each one's revision, sync state, web link and public link. |
 | `design preview [--open [path]] [--port <n>] [--restart] [--foreground]` | Start the viewer in the background, or reuse the running one, and print its URL. |
 | `design stop` | Stop the viewer. |

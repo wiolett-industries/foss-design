@@ -100,8 +100,17 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
         allow: [searchForWorkspaceRoot(paths.root), paths.root, paths.design, PKG.root, ...links.allow],
       },
       watch: {
-        ignored: ['**/.cache/vite/**', '**/.cache/snapshots/**', '**/.cache/shots/**', '**/.cache/build/**'],
+        // `.cache` is ours (server.log, snapshots, builds): a change there must not reload frames. The
+        // generated entries are modules the frames load, so those stay watched.
+        ignored: (file: string) => {
+          const rel = toPosix(path.relative(paths.cache, file))
+          const inCache = rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel)
+          return inCache && rel !== 'entries' && !rel.startsWith('entries/')
+        },
       },
+      // Vite forwards frames' console warnings to the server when an agent runs it; the runtime
+      // already reports errors, and the log they would fill sits in `.cache`.
+      forwardConsole: false,
     },
     optimizeDeps: {
       entries: entries.files().map((file) => toPosix(path.relative(paths.design, file))),
