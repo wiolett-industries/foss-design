@@ -192,13 +192,16 @@ function HomeSkeleton() {
 export function HomePage() {
   const { data: project, error, isLoading } = useProject()
   const { slots } = useViewer()
+  const phone = useIsPhone()
   if (error) return <Notice title="Could not load the project" text={(error as Error).message} />
   if (isLoading || !project) return <HomeSkeleton />
   return (
     <Content>
       <PageHead
         title={project.name}
-        right={slots.homeActions}
+        // On a phone the actions (usually a ⋯ menu) sit at the end of the title row, not alone under it.
+        right={phone ? undefined : slots.homeActions}
+        badge={phone && slots.homeActions ? <span className="ml-auto flex">{slots.homeActions}</span> : undefined}
         sub={
           slots.homeSub ? (
             slots.homeSub

@@ -113,7 +113,9 @@ export function AppTopBar() {
         </div>
         <div className="ml-auto flex items-center gap-2">
           <SearchButton />
-          <ThemeMenu />
+          <span className={cn('flex', slots.barEnd ? 'max-md:hidden' : undefined)}>
+            <ThemeMenu />
+          </span>
           {slots.barEnd}
         </div>
       </Bar>

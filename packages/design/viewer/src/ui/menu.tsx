@@ -37,7 +37,8 @@ export function Menu({
           sideOffset={sideOffset}
           collisionPadding={12}
           className={menuSurface}
-          style={{ width }}
+          // Never wider than a phone's screen.
+          style={{ width, maxWidth: 'calc(100vw - 24px)' }}
         >
           {children}
         </DropdownMenu.Content>

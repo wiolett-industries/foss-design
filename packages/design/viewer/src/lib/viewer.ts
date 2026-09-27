@@ -10,7 +10,10 @@ export interface ViewerSlots {
    * switcher. Links in it resolve against the viewer's base, so `/` is the project's home.
    */
   brand?: ReactNode
-  /** At the end of every top bar. */
+  /**
+   * At the end of every top bar. On a phone the bar's own appearance menu gives way to it: offer
+   * light and dark in it, as an account menu does.
+   */
   barEnd?: ReactNode
   /** Full width under every top bar, above the page: a notice strip. */
   belowBar?: ReactNode
