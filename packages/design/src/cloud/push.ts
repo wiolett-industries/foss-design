@@ -302,7 +302,20 @@ export async function push(
   }
 
   log(`Pushing ${plural(units.length, 'unit')}…`)
-  const revs = await client.push(link.project, units)
+  let revs: Awaited<ReturnType<typeof client.push>>
+  try {
+    revs = await client.push(link.project, units)
+  } catch (error) {
+    // Someone pushed between our look at the cloud and this commit (the server serializes pushes
+    // and takes the first): the same as finding the cloud ahead, which `design push` merges in.
+    if (!(error instanceof CloudError) || error.status !== 409 || error.error !== 'conflict') throw error
+    report.ok = false
+    report.error = {
+      code: 'pull_first',
+      message: 'Nothing was pushed: someone pushed first. Run `design pull`, then push again.',
+    }
+    return report
+  }
   for (const unit of units) {
     const rev = revs.get(unit.key) ?? unit.baseRev + 1
     link.units[unit.key] = { rev, files: hashes(unit.source) }
