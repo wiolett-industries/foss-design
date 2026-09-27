@@ -46,7 +46,7 @@ export function Dialog({
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.14 }}
-                className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-overlay p-6 pt-[12vh] max-md:px-4"
+                className="fixed inset-0 z-50 flex justify-center overflow-y-auto bg-overlay p-6 max-md:px-4"
               >
                 <DialogPrimitive.Content
                   asChild
@@ -69,7 +69,7 @@ export function Dialog({
                     exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.1 } }}
                     transition={{ type: 'spring', stiffness: 560, damping: 40 }}
                     tabIndex={-1}
-                    className={cn(floatingSurface, 'flex max-w-full flex-col outline-none')}
+                    className={cn(floatingSurface, 'my-auto flex max-w-full flex-col outline-none')}
                     style={{ width }}
                   >
                     <PanelHead
