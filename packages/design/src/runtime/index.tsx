@@ -3,6 +3,8 @@
  *
  *   import { holdReady, useTheme, useScreen } from '@design/runtime'
  */
+// First: every frame's own storage, before any module that reads it (storage.ts).
+import './storage'
 import { Component, type ComponentType, type ReactNode, useSyncExternalStore } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { PublicFolder, ViewerMessage } from '../shared/types'

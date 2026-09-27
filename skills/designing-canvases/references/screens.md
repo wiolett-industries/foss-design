@@ -112,6 +112,10 @@ Take the hold first and load a whole app with `await import()` after it, so noth
 
 `go()` was removed in 0.5: `design check` reports it as an error, in screens and in the scripts beside them, and `design push` refuses canvases that use it.
 
+## Storage
+
+Every frame of a canvas runs on one origin, so each gets storage of its own, set up before the screen's code runs: `localStorage` and `sessionStorage` live in memory and start empty on every load, and IndexedDB databases are kept apart per frame (an earlier load's databases are dropped). An app that caches in storage shows the state its own fixtures give it, whatever frames opened before. To start a screen with something stored (a dismissed banner, a saved preference), write it in the screen before the app reads it.
+
 ## Links between screens
 
 Screens link like the app does, and never need anything design-specific for it:
