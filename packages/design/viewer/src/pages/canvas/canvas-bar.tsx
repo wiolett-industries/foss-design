@@ -111,7 +111,7 @@ export function CanvasBar({
           {slots.barEnd}
         </div>
       </Bar>
-      {slots.belowBar}
+      {slots.belowBar ? <div className="shrink-0">{slots.belowBar}</div> : null}
     </>
   )
 }

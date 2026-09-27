@@ -304,7 +304,7 @@ function CanvasView({ canvas, page }: { canvas: CanvasDoc; page: Page | undefine
         }}
         canPlay={order.length > 0}
       />
-      <div className="flex min-h-0 grow">
+      <div className="flex min-h-0 grow basis-0">
         <SlidePanel open={sidebar && !!page} side="left" width={264}>
           {page ? <Sidebar canvas={canvas} page={page} store={store} onPick={focusItem} /> : null}
         </SlidePanel>

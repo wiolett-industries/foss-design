@@ -238,8 +238,8 @@ function Player({ canvas, itemId }: { canvas: CanvasDoc; itemId: string }) {
           {slots.barEnd}
         </div>
       </Bar>
-      {slots.belowBar}
-      <div className="flex min-h-0 grow">
+      {slots.belowBar ? <div className="shrink-0">{slots.belowBar}</div> : null}
+      <div className="flex min-h-0 grow basis-0">
         <div
           ref={stage}
           className={`canvas-dots relative min-w-0 grow ${fit === 'actual' ? 'overflow-auto' : 'overflow-hidden'}`}

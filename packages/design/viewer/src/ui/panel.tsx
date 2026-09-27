@@ -259,7 +259,7 @@ export function Strip({ children, className }: { children: ReactNode; className?
   return (
     <div
       className={cn(
-        'flex min-h-[38px] items-center gap-2 border-t border-rule bg-soft px-4 py-2 text-[12.5px] text-muted',
+        'flex min-h-[38px] shrink-0 items-center gap-2 border-t border-rule bg-soft px-4 py-2 text-[12.5px] text-muted',
         className,
       )}
     >

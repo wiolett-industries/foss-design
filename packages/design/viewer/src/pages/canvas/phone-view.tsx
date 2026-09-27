@@ -211,7 +211,7 @@ function PhoneViewer({ canvas, pageId, itemId }: { canvas: CanvasDoc; pageId?: s
           </>
         }
       />
-      {slots.belowBar}
+      {slots.belowBar ? <div className="shrink-0">{slots.belowBar}</div> : null}
       <div
         ref={stage}
         onTouchStart={onTouchStart}

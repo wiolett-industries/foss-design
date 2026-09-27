@@ -120,7 +120,7 @@ export function AppTopBar() {
         </div>
       </Bar>
       <PhoneTabs location={location} />
-      {slots.belowBar}
+      {slots.belowBar ? <div className="shrink-0">{slots.belowBar}</div> : null}
     </>
   )
 }
