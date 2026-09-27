@@ -15,6 +15,8 @@ interface FrameResult {
   url: string
   ready: boolean
   held?: number
+  /** Milliseconds from load to the ready signal. */
+  readyMs?: number
   errors: string[]
   /** `href`s of the links in the rendered screen, with their text. */
   links: { href: string; text: string }[]
@@ -29,6 +31,8 @@ interface LinkIssue {
 }
 
 const plural = (count: number, word: string, many = `${word}s`) => `${count} ${count === 1 ? word : many}`
+/** A screen slower than this to become ready is named. */
+const SLOW_MS = 3000
 
 function printIssues(issues: Issue[]) {
   const byFile = new Map<string, Issue[]>()
@@ -67,7 +71,15 @@ async function renderFrames(jobs: FrameJob[]): Promise<FrameResult[]> {
       } finally {
         await page.close().catch(() => {})
       }
-      return { key: job.key, url: job.url, ready: report.ready, held: report.held, errors: report.errors, links }
+      return {
+        key: job.key,
+        url: job.url,
+        ready: report.ready,
+        held: report.held,
+        readyMs: report.readyMs,
+        errors: report.errors,
+        links,
+      }
     })
   } finally {
     await browser.close()
@@ -178,7 +190,16 @@ export async function runCheck(
         if (frame.held) print(`    ${red(`holdReady() was not released within 20s (${frame.held} still held)`)}`)
         else if (!frame.ready) print(`    ${red('did not finish rendering (no ready signal within 20s)')}`)
         for (const error of frame.errors) print(`    ${red(error.split('\n')[0]!)}`)
+        if (frame.readyMs !== undefined && frame.readyMs > SLOW_MS)
+          print(`    ${yellow(`slow: ${(frame.readyMs / 1000).toFixed(1)}s to become ready`)}`)
       }
+      const slow = frames.filter((frame) => (frame.readyMs ?? 0) > SLOW_MS)
+      if (slow.length)
+        print(
+          dim(
+            `${plural(slow.length, 'screen')} took over ${SLOW_MS / 1000}s to become ready; every frame of them costs that in the viewer, check and push snapshots. See what they wait for (retries, timers, polling, entrance gates).`,
+          ),
+        )
     }
     if (linkIssues.length) printLinkIssues(linkIssues, project)
     const screens = [...picked.values()].reduce((sum, set) => sum + (set?.size ?? 0), 0)

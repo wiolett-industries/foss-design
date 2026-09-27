@@ -47,6 +47,8 @@ export interface FrameReport {
   ready: boolean
   /** Holds from `holdReady()` still open when the frame gave up waiting. */
   held?: number
+  /** Milliseconds from the page's load to its ready signal (frames that became ready). */
+  readyMs?: number
 }
 
 /** Vite answers this while it bundles dependencies it just found; the page loads fine once it is done. */
@@ -76,6 +78,8 @@ export async function openFrame(
     record(text)
   })
   let ready = false
+  let loadedAt = 0
+  let readyMs: number | undefined
   // A frame that reloads itself never holds a state. Once is how Vite takes in dependencies it just
   // bundled, so that load is given a second try; a frame that reloads again is reported.
   let reloads = 0
@@ -92,6 +96,7 @@ export async function openFrame(
       outdated = () => resolve('outdated')
     })
     await page.goto(url, { waitUntil: 'load', timeout: options.timeoutMs ?? 30000 })
+    loadedAt = Date.now()
     page.on('load', onNavigate)
     if (!ready) {
       const signal = page
@@ -101,6 +106,7 @@ export async function openFrame(
         .then(() => 'ready' as const)
       signal.catch(() => {})
       ready = (await Promise.race([signal, turnedAway]).catch(() => null)) === 'ready'
+      if (ready) readyMs = Date.now() - loadedAt
     }
     // Let entrance animations finish before anyone looks.
     if (ready || options.waitForReady === false) await page.waitForTimeout(options.settleMs ?? 700)
@@ -127,5 +133,10 @@ export async function openFrame(
     (error, index) =>
       error && !errors.some((other, j) => j !== index && other && other.length < error.length && error.includes(other)),
   )
-  return { errors: [...new Set(unique)], ready, ...(held ? { held } : {}) }
+  return {
+    errors: [...new Set(unique)],
+    ready,
+    ...(held ? { held } : {}),
+    ...(readyMs !== undefined ? { readyMs } : {}),
+  }
 }
