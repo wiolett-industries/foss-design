@@ -45,7 +45,7 @@ The viewer reloads by itself: saving a screen hot-updates its frame, and editing
 
 - **Variations** are separate screens with stable ids and titles. Once something is "Option B", it stays "Option B" across turns: never renumber or rename options.
 - **States of one screen** (empty, loading, error, filled, signed-out) are one component with props: list the same `src` several times in `canvas.json`, each with its own `id` and `props`. The component receives them as React props.
-- **Clickable prototypes** keep interaction state in React state inside the screen, and move between screens with `go('<screen-id>')` (or `go('<page-id>/<screen-id>')`) from `@design/runtime`. On the canvas `go` brings the target into view; in play mode it opens it.
+- **Clickable prototypes** keep interaction state in React state inside the screen, and move between screens with `go('<screen-id>')` (or `go('<page-id>/<screen-id>')`) from `@design/runtime`. On the canvas `go` brings the target into view; in play mode it opens it. Every link, nav item and button that leads somewhere either calls `go` to a screen that exists, or is a plain `href="#"` placeholder: a screen is not a site, and a link to an arbitrary path (`/routes`) goes nowhere.
 - **Long pages** (landing pages, docs, settings) use `"height": "auto"` so the frame grows to the content. Fixed frames show exactly one viewport and scroll inside.
 - **Dark mode** comes from the tokens: screens use token utilities (`bg-surface`, `text-ink`) or `dark:` variants, and the viewer's theme toggle switches every frame. Pin a screen with `"theme": "dark"` only when the design is dark-only.
 

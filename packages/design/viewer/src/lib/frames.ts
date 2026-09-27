@@ -1,4 +1,5 @@
-import type { RuntimeMessage, Theme, ViewerMessage } from '@shared/types'
+import type { CanvasDoc, RuntimeMessage, Theme, ViewerMessage } from '@shared/types'
+import { toast } from '../ui/toast'
 import { STATIC_SITE } from './source'
 
 type Handler = (message: RuntimeMessage) => void
@@ -89,4 +90,40 @@ export function frameSrc(url: string, theme: Theme, extra?: Record<string, strin
 /** Absolute URL for opening a frame in a new tab. */
 export function absoluteUrl(url: string): string {
   return new URL(url, document.baseURI).toString()
+}
+
+/**
+ * A link or form the runtime kept from leaving its frame. A path whose last part names a screen
+ * or URL item on the canvas (`/settings`, `settings.html`) goes there; a link to another site
+ * opens in a new tab; anything else says where it pointed.
+ */
+export function followLink(
+  message: Extract<RuntimeMessage, { type: 'link' }>,
+  canvas: CanvasDoc,
+  go: (id: string) => void,
+) {
+  if (message.form) {
+    toast('Forms are not sent from a screen', undefined, 'info')
+    return
+  }
+  if (message.path === null) {
+    const tab = window.open(message.href, '_blank')
+    if (tab) tab.opener = null
+    else toast('Link to another site', message.href, 'info')
+    return
+  }
+  const path = message.path.split(/[?#]/)[0]!.replace(/\/+$/, '')
+  let name = path.slice(path.lastIndexOf('/') + 1).replace(/\.html?$/, '')
+  try {
+    name = decodeURIComponent(name)
+  } catch {}
+  const ids = new Set(
+    canvas.pages.flatMap((page) =>
+      page.sections.flatMap((section) =>
+        section.items.filter((item) => item.kind === 'screen' || item.kind === 'url').map((item) => item.id),
+      ),
+    ),
+  )
+  if (name && ids.has(name)) go(name)
+  else toast('Not a screen on this canvas', message.path, 'info')
 }

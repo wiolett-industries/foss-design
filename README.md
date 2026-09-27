@@ -92,7 +92,7 @@ A minimal `canvas.json`:
 }
 ```
 
-Screens get Tailwind v4 with the design tokens, React, `motion`, `lucide-react`, `clsx` and `tailwind-merge` even when the project has none of them (the project's own copies win when present), plus the project's other packages and any aliases from `design.json`. A screen moves to another with `go('verify')` from `@design/runtime`.
+Screens get Tailwind v4 with the design tokens, React, `motion`, `lucide-react`, `clsx` and `tailwind-merge` even when the project has none of them (the project's own copies win when present), plus the project's other packages and any aliases from `design.json`. A screen moves to another with `go('verify')` from `@design/runtime`; a link whose path ends in a screen id opens that screen, and other links and forms never take the frame off its screen.
 
 The complete formats are in the skills: [canvas.json](skills/designing-canvases/references/canvas-json.md), [screens and runtime](skills/designing-canvases/references/screens.md), [design system](skills/building-design-systems/references/system-format.md).
 

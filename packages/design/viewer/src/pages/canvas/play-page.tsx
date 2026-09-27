@@ -6,7 +6,7 @@ import { SlidePanel } from '../../components/slide-panel'
 import { ThemeMenu } from '../../components/theme-menu'
 import { Bar } from '../../components/topbar'
 import { useCanvas } from '../../lib/api'
-import { frameSrc, listenToFrame, reloadFrame, sendTheme } from '../../lib/frames'
+import { followLink, frameSrc, listenToFrame, reloadFrame, sendTheme } from '../../lib/frames'
 import { useTheme } from '../../lib/theme'
 import { useViewer } from '../../lib/viewer'
 import { IconButton } from '../../ui/button'
@@ -141,6 +141,11 @@ function Player({ canvas, itemId }: { canvas: CanvasDoc; itemId: string }) {
         const [pagePart, idPart] = message.target.includes('/') ? message.target.split('/') : [null, message.target]
         const target = all.find((e) => e.item.id === idPart && (!pagePart || e.pageId === pagePart))
         if (target) navigate(playHref(canvas.id, target.item.id, target.pageId))
+      } else if (message.type === 'link') {
+        followLink(message, canvas, (id) => {
+          const target = all.find((e) => e.item.id === id)
+          if (target) navigate(playHref(canvas.id, target.item.id, target.pageId))
+        })
       }
     })
   }, [item, src, all, canvas.id, navigate, back])

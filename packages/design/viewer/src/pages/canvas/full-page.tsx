@@ -2,7 +2,7 @@ import type { RuntimeMessage, ScreenItem, Theme, UrlItem } from '@shared/types'
 import { useEffect, useRef } from 'react'
 import { Link, useLocation, useRouter } from 'wouter'
 import { useCanvas } from '../../lib/api'
-import { absoluteUrl, frameSrc, listenToFrame, sendTheme } from '../../lib/frames'
+import { absoluteUrl, followLink, frameSrc, listenToFrame, sendTheme } from '../../lib/frames'
 import { useTheme } from '../../lib/theme'
 import { useViewer } from '../../lib/viewer'
 import { Icon } from '../../ui/icon'
@@ -71,6 +71,8 @@ export function FullPage({ canvasId, itemId }: { canvasId: string; itemId: strin
       else if (message.type === 'go') {
         const id = message.target.includes('/') ? message.target.split('/')[1]! : message.target
         if (items.some((entry) => entry.id === id)) navigate(fullHref(canvasId, id, theme), { replace: true })
+      } else if (message.type === 'link' && canvas) {
+        followLink(message, canvas, (id) => navigate(fullHref(canvasId, id, theme), { replace: true }))
       }
     })
   }, [url, item?.kind])

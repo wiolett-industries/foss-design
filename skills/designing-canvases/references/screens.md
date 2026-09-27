@@ -94,6 +94,14 @@ import { go, useTheme, useScreen } from '@design/runtime'
 
 Clickable prototypes: keep interaction state in React state inside the screen (tabs, modals, form steps), and use `go()` only to move between frames that are separate screens on the canvas.
 
+Links and forms. A frame shows one screen; it cannot follow a link to another page of a site. The runtime keeps the frame where it is and tells the viewer where the link pointed:
+
+- a link whose path ends in a screen id on the canvas (`href="/settings"`, `settings.html`) opens that screen, like `go('settings')`;
+- a link to another site opens in a new tab;
+- any other link, and a form submit the screen does not handle itself, stay on the screen with a note in the viewer.
+
+So wire navigation on purpose: sidebars, tabs, breadcrumbs and buttons call `go('<screen-id>')` (or use an `href` ending in that id) for every destination that has a screen, and use `href="#"` for the rest. Handle `onSubmit` with `preventDefault()` and move on with `go()` or state. Links inside the page (`#section`) scroll as usual, and a router inside the screen (its own `pushState`) keeps working.
+
 ## Frame size and scrolling
 
 - A fixed frame (`device`, or numeric `width`/`height`) is one viewport: the page scrolls inside it, `100vh`/`min-h-screen` equals the frame height, and `position: fixed` headers behave like on a device.

@@ -199,6 +199,44 @@ async function takeSnapshot() {
   }
 }
 
+/**
+ * A screen's links and forms would take the frame to another page, and the frame's origin
+ * serves screens only: the viewer would show an error page in the screen's place. Once the
+ * screen's own handlers had their say (a router that handled the click prevents the default),
+ * the frame stays put and the viewer hears where the link pointed. Links within the page
+ * (`#section`) still scroll.
+ */
+function keepLinksInFrame() {
+  const report = (target: URL, form: boolean) =>
+    post({
+      type: 'link',
+      href: target.href,
+      path: target.origin === location.origin ? target.pathname + target.search + target.hash : null,
+      form,
+    })
+  const onClick = (event: MouseEvent) => {
+    if (event.defaultPrevented || event.button > 1) return
+    const link = (event.target as Element | null)?.closest?.('a[href], area[href]') as HTMLAnchorElement | null
+    if (!link || link.hasAttribute('download')) return
+    const target = new URL(link.href, location.href)
+    if (target.protocol !== 'http:' && target.protocol !== 'https:') return
+    const samePage =
+      target.origin === location.origin && target.pathname === location.pathname && target.search === location.search
+    if (samePage && target.hash) return
+    event.preventDefault()
+    report(target, false)
+  }
+  window.addEventListener('click', onClick)
+  window.addEventListener('auxclick', onClick)
+  window.addEventListener('submit', (event) => {
+    const form = event.target as HTMLFormElement
+    // method="dialog" only closes its dialog.
+    if (event.defaultPrevented || form.method === 'dialog') return
+    event.preventDefault()
+    report(new URL(form.getAttribute('action') || location.href, location.href), true)
+  })
+}
+
 let booted = false
 let hmrBound = false
 /** Set when the frame sits on the canvas: only then does the wheel belong to the viewer. */
@@ -265,6 +303,7 @@ export function boot() {
     },
     true,
   )
+  if (embedded) keepLinksInFrame()
   window.addEventListener('blur', () => post({ type: 'blur' }))
   window.addEventListener('error', (event) => recordError(event.message || 'Script error'))
   window.addEventListener('unhandledrejection', (event) => {

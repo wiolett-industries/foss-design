@@ -10,7 +10,7 @@ interface ToastItem {
   tone: ToastTone
 }
 
-export type ToastTone = 'ok' | 'error'
+export type ToastTone = 'ok' | 'info' | 'error'
 
 const toasts = new Store<ToastItem[]>([])
 let next = 1
@@ -50,6 +50,8 @@ export function Toaster() {
           >
             {item.tone === 'error' ? (
               <Icon name="alert" size={15} className="text-danger-text" />
+            ) : item.tone === 'info' ? (
+              <Icon name="info" size={15} className="text-muted" />
             ) : (
               <Icon name="check" size={15} className="text-ok-text" />
             )}

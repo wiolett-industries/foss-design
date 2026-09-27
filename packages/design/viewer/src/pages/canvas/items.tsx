@@ -12,6 +12,7 @@ import type { FrameMode } from './viewport'
 
 export interface FrameEvents {
   onGo(from: string, target: string): void
+  onLink(from: string, message: Extract<RuntimeMessage, { type: 'link' }>): void
   onWheel(
     frame: HTMLIFrameElement,
     message: { deltaX: number; deltaY: number; x: number; y: number; zoom: boolean },
@@ -104,6 +105,9 @@ export const FrameItem = memo(function FrameItem({
           break
         case 'go':
           events.onGo(item.id, message.target)
+          break
+        case 'link':
+          events.onLink(item.id, message)
           break
         case 'wheel':
           events.onWheel(frame, message)

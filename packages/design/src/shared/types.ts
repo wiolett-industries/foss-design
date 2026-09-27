@@ -284,6 +284,11 @@ export type RuntimeMessage =
   | { source: 'design-runtime'; key: string; type: 'size'; width: number; height: number }
   | { source: 'design-runtime'; key: string; type: 'error'; message: string }
   | { source: 'design-runtime'; key: string; type: 'go'; target: string }
+  /**
+   * A link or form in the screen would have taken the frame to another page, which the frame's
+   * origin does not serve; the runtime kept the frame put. `path` is set for its own origin.
+   */
+  | { source: 'design-runtime'; key: string; type: 'link'; href: string; path: string | null; form: boolean }
   | {
       source: 'design-runtime'
       key: string

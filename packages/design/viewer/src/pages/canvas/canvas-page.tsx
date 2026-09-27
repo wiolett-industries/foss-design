@@ -7,6 +7,7 @@ import { IssueList } from '../../components/issues'
 import { SlidePanel } from '../../components/slide-panel'
 import { useCanvas } from '../../lib/api'
 import { takeFocus } from '../../lib/focus'
+import { followLink } from '../../lib/frames'
 import { useStore } from '../../lib/store'
 import { useTheme } from '../../lib/theme'
 import { IconButton } from '../../ui/button'
@@ -177,6 +178,9 @@ function CanvasView({ canvas, page }: { canvas: CanvasDoc; page: Page | undefine
           return
         }
         console.warn(`[design] go("${target}"): no such screen`)
+      },
+      onLink(from, message) {
+        followLink(message, canvas, (id) => this.onGo(from, id))
       },
       onWheel(frame, message) {
         const root = frame.closest('.canvas-root') as HTMLElement | null
