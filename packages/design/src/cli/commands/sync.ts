@@ -2,9 +2,9 @@ import { CloudError } from '../../cloud/client'
 import { pull } from '../../cloud/pull'
 import { push } from '../../cloud/push'
 import { readLink } from '../../cloud/state'
-import { openSync, plural, type SyncContext, type SyncReport, type UnitReport } from '../../cloud/sync'
+import { openSync, plural, type SyncContext, type SyncReport, type UnitReport, webUrl } from '../../cloud/sync'
 import type { DesignPaths } from '../../core/paths'
-import { bold, CliError, dim, green, print, red, yellow } from '../log'
+import { bold, CliError, dim, green, print, progress, red, yellow } from '../log'
 
 const GOOD = new Set<UnitReport['action']>(['pushed', 'created', 'updated', 'deleted'])
 const BAD = new Set<UnitReport['action']>(['conflict', 'remote_ahead'])
@@ -24,8 +24,8 @@ function printReport(report: SyncReport) {
   const shown = report.units.filter((entry) => !QUIET.has(entry.action))
   const quiet = report.units.length - shown.length
   const moved = report.units.some((entry) => GOOD.has(entry.action))
-  if (report.ok && !moved) print(`${bold(`Nothing to ${report.command}`)} ${dim(`${report.project} · ${report.host}`)}`)
-  else if (report.ok) print(`${bold(verb)} ${report.project} ${dim(report.host)}`)
+  if (report.ok && !moved) print(`${bold(`Nothing to ${report.command}`)} ${dim(report.url)}`)
+  else if (report.ok) print(`${bold(verb)} ${report.url}`)
   else print(`${bold(report.command === 'push' ? 'Push stopped' : 'Pull finished with conflicts')} ${dim(report.host)}`)
   const width = Math.max(0, ...shown.map((entry) => entry.unit.length))
   for (const entry of shown) {
@@ -43,6 +43,7 @@ function printReport(report: SyncReport) {
       : ''
     const detail = [entry.action.replaceAll('_', ' '), revs(entry), files].filter(Boolean).join('  ')
     print(`  ${mark} ${entry.unit.padEnd(width)}  ${detail}`)
+    if (entry.url && GOOD.has(entry.action)) print(`      ${dim('→')} ${entry.url}`)
     if (entry.message) print(`      ${dim(entry.message)}`)
   }
   if (quiet) print(dim(`  ${plural(quiet, 'unit')} ${report.command === 'push' ? 'unchanged' : 'up to date'}`))
@@ -57,7 +58,7 @@ async function runSync(
 ) {
   let report: SyncReport
   try {
-    report = await run(openSync(paths, json ? () => {} : (line) => print(dim(line))))
+    report = await run(json ? openSync(paths, () => {}) : openSync(paths, (line) => print(dim(line)), progress))
   } catch (error) {
     if (!json) throw error
     let link: ReturnType<typeof readLink> = null
@@ -70,6 +71,7 @@ async function runSync(
       command,
       host: link?.host ?? '',
       project: link?.project ?? '',
+      url: link ? webUrl(link) : '',
       units: [],
       hints: [],
       error: {

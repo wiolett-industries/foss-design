@@ -4,9 +4,23 @@ import { mapLimit } from '../capture/frames'
 import { CliError } from '../cli/log'
 import { DesignProject } from '../core/project'
 import { STATIC_URLS } from '../core/sources'
-import type { PushUnit, RemoteUnit } from './client'
+import { CloudError, type PushUnit, type RemoteUnit } from './client'
 import { hashes, incomingDir, type UnitStatus, unitStatus, writeLink } from './state'
-import { byUnit, newReport, plural, type SyncContext, type SyncReport, type UnitReport, unique, unitArg } from './sync'
+import {
+  byUnit,
+  megabytes,
+  newReport,
+  plural,
+  rate,
+  type SyncContext,
+  type SyncReport,
+  seconds,
+  TRANSFERS,
+  type UnitReport,
+  unique,
+  unitArg,
+  webUrl,
+} from './sync'
 import {
   buildManifest,
   buildUnit,
@@ -17,8 +31,6 @@ import {
   unitBuildDir,
   unitCanvasId,
 } from './units'
-
-const megabytes = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(bytes < 10 * 1024 * 1024 ? 1 : 0)} MB`
 
 function blockedReport(status: UnitStatus, message: string): UnitReport {
   return {
@@ -185,7 +197,7 @@ export async function push(ctx: SyncContext, options: { units: string[]; resolve
   const pushing = toPush.filter((key) => {
     const s = status(key)
     if (systemPush || resolved.includes(key) || s.changed.length || !remote.has(key)) return true
-    report.units.push({ unit: key, action: 'unchanged', rev: s.baseRev })
+    report.units.push({ unit: key, action: 'unchanged', rev: s.baseRev, url: webUrl(link, key) })
     return false
   })
   if (!pushing.length) return report
@@ -230,10 +242,29 @@ export async function push(ctx: SyncContext, options: { units: string[]; resolve
     const unknown = missing.find((hash) => !files.has(hash))
     if (unknown) throw new CliError(`The cloud asked for ${unknown.slice(0, 12)}, which is not part of this push`)
     const bytes = missing.reduce((sum, hash) => sum + fs.statSync(files.get(hash)!).size, 0)
-    log(`Uploading ${plural(missing.length, 'file')} (${megabytes(bytes)})…`)
-    await mapLimit(missing, 4, async (hash) => {
-      await client.putBlob(link.project, hash, fs.readFileSync(files.get(hash)!))
+    const bar = ctx.progress()
+    const started = Date.now()
+    let sentFiles = 0
+    let sentBytes = 0
+    const line = () =>
+      `Uploading ${sentFiles}/${missing.length} files · ${megabytes(sentBytes)} of ${megabytes(bytes)}${rate(sentBytes, started)}`
+    bar.update(line())
+    await mapLimit(missing, TRANSFERS, async (hash) => {
+      const file = files.get(hash)!
+      const data = fs.readFileSync(file)
+      try {
+        await client.putBlob(link.project, hash, data)
+      } catch (error) {
+        // Name the file: a 413 is about this one, not about the whole push.
+        if (error instanceof CloudError && error.status === 413)
+          throw new CliError(`${path.relative(process.cwd(), file)} (${megabytes(data.length)}): ${error.message}`)
+        throw error
+      }
+      sentFiles++
+      sentBytes += data.length
+      bar.update(line())
     })
+    bar.done(`Uploaded ${plural(missing.length, 'file')} (${megabytes(bytes)}) in ${seconds(started)}`)
   }
 
   log(`Pushing ${plural(units.length, 'unit')}…`)
@@ -241,7 +272,13 @@ export async function push(ctx: SyncContext, options: { units: string[]; resolve
   for (const unit of units) {
     const rev = revs.get(unit.key) ?? unit.baseRev + 1
     link.units[unit.key] = { rev, files: hashes(unit.source) }
-    report.units.push({ unit: unit.key, action: unit.baseRev ? 'pushed' : 'created', rev, baseRev: unit.baseRev })
+    report.units.push({
+      unit: unit.key,
+      action: unit.baseRev ? 'pushed' : 'created',
+      rev,
+      baseRev: unit.baseRev,
+      url: webUrl(link, unit.key),
+    })
   }
   for (const key of resolved) fs.rmSync(incomingDir(paths, key), { recursive: true, force: true })
   writeLink(paths, link)

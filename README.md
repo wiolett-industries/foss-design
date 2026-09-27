@@ -111,7 +111,7 @@ The complete formats are in the skills: [canvas.json](skills/designing-canvases/
 | `design build [canvas…] [--out <dir>] [--tar]` | Build a static site of the canvases and the design system, optionally packed as an archive. |
 | `design login` / `design logout` | Sign this machine in to [foss-design Cloud](#cloud) or forget its token. |
 | `design link [<project>] [--new <name>]` | List your cloud projects, or link `.design` to one (or to a new one). |
-| `design push [canvas…] [--resolved <unit>] [--json]` | Build and upload what changed; stops when the cloud is ahead. |
+| `design push [canvas…] [--resolved <unit>] [--json]` | Build and upload what changed, with progress, then print the web link of each pushed canvas; stops when the cloud is ahead. |
 | `design pull [canvas…] [--theirs <unit>] [--json]` | Take cloud changes; a unit changed on both sides becomes a conflict (exit 2). |
 
 `--root <dir>` points any command at a project; by default the nearest folder with `.design` is used. The viewer listens on a free port picked at start, so several projects can preview at once; `--port` or `"port"` in `design.json` pins one. It opens a browser only with `--open`.

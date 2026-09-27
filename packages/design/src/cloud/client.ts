@@ -103,6 +103,8 @@ function errorFor(host: string, status: number, body: unknown, retryAfter: strin
   if (status === 401)
     return new CloudError(`Not signed in to ${host}, or the token was revoked. Run \`design login\`.`, status, code)
   let message = text(data.message) ?? DEFAULT_MESSAGE[status] ?? `${host} answered ${status}`
+  // Without the cloud's own JSON the answer came from a proxy in front of it, not from a plan limit.
+  if (status === 413 && !str(data.error)) message = `A proxy in front of ${host} refused it as too large (HTTP 413)`
   if (code === 'account_banned') message = `Your account is banned: ${message}`
   if (limit) message += ` (limit: ${limit})`
   if (status === 429 && retryAfter) message += `; retry in ${retryAfter}s`

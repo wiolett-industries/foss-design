@@ -5,7 +5,20 @@ import { CliError } from '../cli/log'
 import { type DesignPaths, isInside } from '../core/paths'
 import type { RemoteUnit } from './client'
 import { allUnitKeys, hashes, incomingDir, unitStatus, writeLink } from './state'
-import { byUnit, newReport, plural, type SyncContext, type SyncReport, type UnitReport, unique, unitArg } from './sync'
+import {
+  byUnit,
+  megabytes,
+  newReport,
+  plural,
+  rate,
+  type SyncContext,
+  type SyncReport,
+  seconds,
+  TRANSFERS,
+  type UnitReport,
+  unique,
+  unitArg,
+} from './sync'
 import { caseClashes, isUnitPath, type Manifest, SYSTEM_UNIT, scanLocal, unitRelative, unitRoot } from './units'
 
 const HASH = /^[0-9a-f]{64}$/
@@ -74,7 +87,7 @@ function applyUnit(paths: DesignPaths, key: string, local: Manifest, target: Man
  * `.design/.cache/cloud/incoming/<unit>/` and record the conflict.
  */
 export async function pull(ctx: SyncContext, options: { units: string[]; theirs: string[] }): Promise<SyncReport> {
-  const { paths, client, log } = ctx
+  const { paths, client } = ctx
   const link = structuredClone(ctx.link)
   const report = newReport('pull', link)
   const selected = unique(options.units.map(unitArg))
@@ -187,10 +200,21 @@ export async function pull(ctx: SyncContext, options: { units: string[]; theirs:
     else download.push(hash)
   }
   if (download.length) {
-    log(`Downloading ${plural(download.length, 'file')}…`)
-    await mapLimit(download, 4, async (hash) => {
-      blobs.set(hash, await client.getBlob(link.project, hash))
+    const bar = ctx.progress()
+    const started = Date.now()
+    let gotFiles = 0
+    let gotBytes = 0
+    const line = () =>
+      `Downloading ${gotFiles}/${download.length} files · ${megabytes(gotBytes)}${rate(gotBytes, started)}`
+    bar.update(line())
+    await mapLimit(download, TRANSFERS, async (hash) => {
+      const data = await client.getBlob(link.project, hash)
+      blobs.set(hash, data)
+      gotFiles++
+      gotBytes += data.length
+      bar.update(line())
     })
+    bar.done(`Downloaded ${plural(download.length, 'file')} (${megabytes(gotBytes)}) in ${seconds(started)}`)
   }
 
   for (const plan of plans) {

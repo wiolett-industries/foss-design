@@ -81,8 +81,8 @@ When the user wants the canvases in foss-design Cloud (to share with teammates, 
 1. `$D status` shows whether this machine is signed in and whether `.design` is linked.
 2. Not signed in: run `$D login`. It prints a link with the code in it and waits. Give the user that link exactly as printed and wait for the command to finish; never open or approve it yourself.
 3. Not linked: `$D link` lists the user's projects; `$D link <project-id>` links one, `$D link --new "<name>"` creates one. Ask which when it is not obvious.
-4. `$D push` uploads what changed. If it stops with "pull first" (exit 2), run `$D pull`. A unit changed on both sides is left untouched and the cloud version is written to `.design/.cache/cloud/incoming/<unit>/`: merge it into the local files, keeping both sides' intent, then `$D push --resolved <unit>`. Use `$D pull --theirs <unit>` only when the user says to drop the local changes.
-5. Sharing, roles and public links are managed in the web app at the project page; hand the user the link to it.
+4. `$D push` uploads what changed and prints the web link of the project and of every pushed canvas; give the user those links. If it stops with "pull first" (exit 2), run `$D pull`. A unit changed on both sides is left untouched and the cloud version is written to `.design/.cache/cloud/incoming/<unit>/`: merge it into the local files, keeping both sides' intent, then `$D push --resolved <unit>`. Use `$D pull --theirs <unit>` only when the user says to drop the local changes.
+5. Sharing, roles and public links are managed in the web app at the project page (the link `$D push` printed first).
 
 Never publish through Claude Artifacts, and never paste screen source into chat as a substitute for the canvas.
 

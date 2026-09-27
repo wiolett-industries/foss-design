@@ -9,7 +9,7 @@ import { runInit, runNew, runSystemInit } from './commands/scaffold'
 import { runShot } from './commands/shot'
 import { runStatus } from './commands/status'
 import { runPull, runPush } from './commands/sync'
-import { bold, CliError, dim, print, red } from './log'
+import { bold, CliError, dim, endLine, print, red } from './log'
 
 const HELP = `${bold('foss-design')} ${dim(`v${packageVersion()}`)} — design canvases and design systems in .design
 
@@ -48,7 +48,8 @@ ${bold('Cloud')}  ${dim('units: system (design.json + system/) and canvas/<id>; 
                                              (linking to another project replaces the link)
   push [canvas…] [--json]                    Build and upload what changed here (or the named units); a
        [--resolved <unit>]                   system change pushes every active canvas with it. Stops if
-                                             the cloud is ahead; --resolved marks a merged conflict
+                                             the cloud is ahead; --resolved marks a merged conflict.
+                                             Prints the web link of every pushed canvas
   pull [canvas…] [--json]                    Take cloud changes into .design; a unit changed on both sides
        [--theirs <unit>]                     goes to .design/.cache/cloud/incoming/<unit> (exit 2);
                                              --theirs takes the cloud version and drops local changes
@@ -168,6 +169,7 @@ async function main(argv: string[]) {
 }
 
 main(process.argv.slice(2)).catch((error) => {
+  endLine()
   if (error instanceof CliError) {
     process.stderr.write(`${red('error')} ${error.message}\n`)
     process.exit(error.code)

@@ -37,7 +37,7 @@ Or install the `design` command globally: `npm i -g foss-design`.
 | `build [canvas…] [--out] [--tar]` | Static site. |
 | `login`, `logout` | Sign this machine in to foss-design Cloud (a link with the code in it). |
 | `link [<project>] [--new <name>]` | List cloud projects, or link `.design` to one. |
-| `push [canvas…] [--resolved <unit>]`, `pull [canvas…] [--theirs <unit>]` | Sync with the cloud; exit 2 on a conflict. |
+| `push [canvas…] [--resolved <unit>]`, `pull [canvas…] [--theirs <unit>]` | Sync with the cloud, with progress; push prints the web link of each pushed canvas; exit 2 on a conflict. |
 
 Requirements: Node.js 20.19+. `check --render` and `shot` need an installed Chrome, Chromium, Edge or Brave, or `DESIGN_CHROME` pointing at one.
 
