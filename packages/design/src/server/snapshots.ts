@@ -70,11 +70,16 @@ export class SnapshotStore {
     if (!isSafeSegment(canvas) || !isSafeSegment(id)) throw new Error('bad snapshot key')
     const dir = path.join(this.dir, canvas)
     fs.mkdirSync(dir, { recursive: true })
-    fs.writeFileSync(path.join(dir, `${id}.${theme}.png`), png)
+    const file = path.join(dir, `${id}.${theme}.png`)
+    fs.writeFileSync(`${file}.${process.pid}.tmp`, png)
+    fs.renameSync(`${file}.${process.pid}.tmp`, file)
     const data = this.load(canvas)
     const version = Date.now()
     data[id] = { ...data[id], [theme]: version, ...(height ? { height } : {}) }
-    fs.writeFileSync(this.metaFile(canvas), JSON.stringify(data))
+    // Written aside and renamed: a run stopped mid-write leaves the old file, not half of one.
+    const temp = `${this.metaFile(canvas)}.${process.pid}.tmp`
+    fs.writeFileSync(temp, JSON.stringify(data))
+    fs.renameSync(temp, this.metaFile(canvas))
     return { url: this.url(canvas, id, theme, version) }
   }
 

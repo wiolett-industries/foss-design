@@ -1,16 +1,18 @@
 import fs from 'node:fs'
+import os from 'node:os'
 import type { Progress } from '../cli/log'
 import { DesignProject } from '../core/project'
 import { DEV_URLS } from '../core/sources'
 import { SnapshotStore } from '../server/snapshots'
-import type { Theme } from '../shared/types'
+import type { CanvasDoc, Theme } from '../shared/types'
+import { serveBuild } from './build-server'
 import { findChrome, launchChrome, openFrame } from './chrome'
 import { canvasFrames, mapLimit } from './frames'
 
 /** Snapshots are this wide at most, as the viewer takes them. */
 const SNAPSHOT_WIDTH = 900
-/** Pages Chrome renders at once. */
-const TABS = 4
+/** Pages Chrome renders at once: one per core but one, two to eight. */
+const TABS = Math.min(8, Math.max(2, os.availableParallelism() - 1))
 const THEMES: Theme[] = ['light', 'dark']
 
 export interface SnapshotTarget {
@@ -59,20 +61,34 @@ export function staleSnapshots(
 }
 
 /**
- * Take `targets` in Chrome through the preview server (`base` starts it), a few at a time, with
- * `progress` counting them. Returns lines worth telling the user; without Chrome nothing happens.
+ * Take `targets` in Chrome, a few tabs at a time, with `progress` counting them. The canvases are
+ * built as `design push` builds them and served as files, so a frame loads its few bundles rather
+ * than the dev server's module graph; when that build fails, the preview server (`preview`) serves
+ * them instead. Returns lines worth telling the user; without Chrome nothing happens.
  */
 export async function takeSnapshots(
   paths: DesignProject['paths'],
   targets: readonly SnapshotTarget[],
-  base: () => Promise<string>,
+  preview: () => Promise<string>,
   progress: Progress,
 ): Promise<string[]> {
   if (!targets.length) return []
   if (!findChrome()) return ['No Chrome here, so screens keep the snapshots they have.']
   const store = new SnapshotStore(paths.snapshots)
   const project = new DesignProject(paths, DEV_URLS, store.lookup)
-  const url = await base()
+  const canvases = [...new Set(targets.map((target) => target.canvas))]
+  progress.update(`Building ${canvases.join(', ')} to take snapshots from…`)
+  let url: string
+  let docOf = (id: string): CanvasDoc => project.canvas(id)!.doc
+  let stop = async () => {}
+  try {
+    const build = await serveBuild(paths, 'snapshot-build', { canvases, includeSystem: false })
+    url = build.base
+    docOf = (id) => build.read<CanvasDoc>(`api/canvas/${id}.json`) ?? project.canvas(id)!.doc
+    stop = build.close
+  } catch {
+    url = await preview()
+  }
   const browser = await launchChrome()
   const failed: string[] = []
   const started = Date.now()
@@ -81,7 +97,7 @@ export async function takeSnapshots(
   progress.update(line())
   try {
     await mapLimit([...targets], TABS, async ({ canvas, screen, theme }) => {
-      const job = canvasFrames(project.canvas(canvas)!.doc, url, theme, { id: screen })[0]
+      const job = canvasFrames(docOf(canvas), url, theme, { id: screen })[0]
       if (job) {
         const page = await browser.newPage({
           viewport: { width: job.width, height: job.height },
@@ -106,6 +122,7 @@ export async function takeSnapshots(
     })
   } finally {
     await browser.close()
+    await stop()
   }
   const seconds = Math.round((Date.now() - started) / 1000)
   progress.done(`Took ${targets.length - failed.length} snapshot${targets.length === 1 ? '' : 's'} in ${seconds}s`)

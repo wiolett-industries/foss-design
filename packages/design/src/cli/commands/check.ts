@@ -1,8 +1,4 @@
-import fs from 'node:fs'
-import http from 'node:http'
-import path from 'node:path'
-import sirv from 'sirv'
-import { buildSite } from '../../build/static'
+import { serveBuild } from '../../capture/build-server'
 import { type FrameReport, launchChrome, openFrame } from '../../capture/chrome'
 import { canvasFrames, type FrameJob, mapLimit, systemFrames } from '../../capture/frames'
 import type { DesignPaths } from '../../core/paths'
@@ -130,43 +126,15 @@ export async function runCheck(
     let systemDoc: SystemDoc | null = project.system()?.doc ?? null
     let close = async () => {}
     if (options.built) {
-      const out = path.join(paths.cache, 'check-build')
-      fs.rmSync(out, { recursive: true, force: true })
       if (!options.json) print(dim('Building the screens as design push does…'))
-      await buildSite(paths, out, {
+      const build = await serveBuild(paths, 'check-build', {
         canvases: canvases.length ? canvases : undefined,
         includeSystem: !canvases.length,
-        includeViewer: false,
       })
-      const read = <T>(rel: string): T | null => {
-        try {
-          return JSON.parse(fs.readFileSync(path.join(out, rel), 'utf8')) as T
-        } catch {
-          return null
-        }
-      }
-      docOf = (id) => read<CanvasDoc>(`api/canvas/${id}.json`) ?? project.canvas(id)!.doc
-      systemDoc = canvases.length ? null : read<SystemDoc>('api/system.json')
-      const files = sirv(out, { dev: true })
-      const server = http.createServer((req, res) => {
-        // Segment by segment, as the cloud's content host does: sirv leaves `%40` (from `@system`) encoded.
-        const url = new URL(req.url ?? '/', 'http://localhost')
-        const segments = url.pathname.split('/').map((segment) => {
-          try {
-            return decodeURIComponent(segment)
-          } catch {
-            return segment
-          }
-        })
-        req.url = segments.join('/') + url.search
-        files(req, res, () => {
-          res.statusCode = 404
-          res.end('Not found')
-        })
-      })
-      await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
-      base = `http://127.0.0.1:${(server.address() as { port: number }).port}`
-      close = () => new Promise((resolve) => server.close(() => resolve()))
+      docOf = (id) => build.read<CanvasDoc>(`api/canvas/${id}.json`) ?? project.canvas(id)!.doc
+      systemDoc = canvases.length ? null : build.read<SystemDoc>('api/system.json')
+      base = build.base
+      close = build.close
       if (!options.json) print(dim(`Serving the build at ${base}`))
     } else {
       const wasRunning = await liveServer(paths)
