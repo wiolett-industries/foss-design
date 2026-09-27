@@ -1,3 +1,8 @@
+import fs from 'node:fs'
+import http from 'node:http'
+import path from 'node:path'
+import sirv from 'sirv'
+import { buildSite } from '../../build/static'
 import { type FrameReport, launchChrome, openFrame } from '../../capture/chrome'
 import { canvasFrames, type FrameJob, mapLimit, systemFrames } from '../../capture/frames'
 import type { DesignPaths } from '../../core/paths'
@@ -5,7 +10,7 @@ import { DesignProject } from '../../core/project'
 import { DEV_URLS } from '../../core/sources'
 import { liveServer } from '../../server/state'
 import { compileRoute, linkPath, matchRoute } from '../../shared/routes'
-import type { Issue } from '../../shared/types'
+import type { CanvasDoc, Issue, SystemDoc } from '../../shared/types'
 import { bold, CliError, dim, green, print, red, yellow } from '../log'
 import { ensureServer } from './preview'
 
@@ -80,7 +85,7 @@ async function renderFrames(jobs: FrameJob[]): Promise<FrameResult[]> {
 export async function runCheck(
   paths: DesignPaths,
   targets: string[],
-  options: { render: boolean; json: boolean; page?: string },
+  options: { render: boolean; json: boolean; page?: string; built?: boolean },
 ) {
   const project = new DesignProject(paths, DEV_URLS)
   const known = project.canvasIds()
@@ -117,13 +122,61 @@ export async function runCheck(
 
   let frames: FrameResult[] = []
   if (options.render) {
-    const wasRunning = await liveServer(paths)
-    const server = await ensureServer(paths, {})
-    if (!wasRunning && !options.json)
-      print(dim(`Started the preview server at ${server.url} (\`design stop\` stops it).`))
-    const base = `http://127.0.0.1:${server.port}`
+    // --built renders what `design push` uploads: the production build, served as files. React's
+    // production build, minified code and real timings differ from the dev server in ways a
+    // screen can depend on (no `act`, loading states that end at once).
+    let base: string
+    let docOf = (id: string): CanvasDoc => project.canvas(id)!.doc
+    let systemDoc: SystemDoc | null = project.system()?.doc ?? null
+    let close = async () => {}
+    if (options.built) {
+      const out = path.join(paths.cache, 'check-build')
+      fs.rmSync(out, { recursive: true, force: true })
+      if (!options.json) print(dim('Building the screens as design push does…'))
+      await buildSite(paths, out, {
+        canvases: canvases.length ? canvases : undefined,
+        includeSystem: !canvases.length,
+        includeViewer: false,
+      })
+      const read = <T>(rel: string): T | null => {
+        try {
+          return JSON.parse(fs.readFileSync(path.join(out, rel), 'utf8')) as T
+        } catch {
+          return null
+        }
+      }
+      docOf = (id) => read<CanvasDoc>(`api/canvas/${id}.json`) ?? project.canvas(id)!.doc
+      systemDoc = canvases.length ? null : read<SystemDoc>('api/system.json')
+      const files = sirv(out, { dev: true })
+      const server = http.createServer((req, res) => {
+        // Segment by segment, as the cloud's content host does: sirv leaves `%40` (from `@system`) encoded.
+        const url = new URL(req.url ?? '/', 'http://localhost')
+        const segments = url.pathname.split('/').map((segment) => {
+          try {
+            return decodeURIComponent(segment)
+          } catch {
+            return segment
+          }
+        })
+        req.url = segments.join('/') + url.search
+        files(req, res, () => {
+          res.statusCode = 404
+          res.end('Not found')
+        })
+      })
+      await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+      base = `http://127.0.0.1:${(server.address() as { port: number }).port}`
+      close = () => new Promise((resolve) => server.close(() => resolve()))
+      if (!options.json) print(dim(`Serving the build at ${base}`))
+    } else {
+      const wasRunning = await liveServer(paths)
+      const server = await ensureServer(paths, {})
+      if (!wasRunning && !options.json)
+        print(dim(`Started the preview server at ${server.url} (\`design stop\` stops it).`))
+      base = `http://127.0.0.1:${server.port}`
+    }
     const jobs = (canvases.length ? canvases : known).flatMap((id) => {
-      const doc = project.canvas(id)!.doc
+      const doc = docOf(id)
       const theme = doc.theme ?? 'light'
       const screens = picked.get(id)
       const filter = { includeUrls: false, page: options.page }
@@ -131,10 +184,13 @@ export async function runCheck(
         ? [...screens].flatMap((screen) => canvasFrames(doc, base, theme, { ...filter, id: screen }))
         : canvasFrames(doc, base, theme, filter)
     })
-    const system = project.system()
-    if (!canvases.length && system) jobs.unshift(...systemFrames(system.doc, base, 'light'))
-    if (!options.json) print(dim(`Loading ${plural(jobs.length, 'frame')} in Chrome via ${server.url}…`))
-    frames = await renderFrames(jobs)
+    if (!canvases.length && systemDoc) jobs.unshift(...systemFrames(systemDoc, base, 'light'))
+    if (!options.json) print(dim(`Loading ${plural(jobs.length, 'frame')} in Chrome…`))
+    try {
+      frames = await renderFrames(jobs)
+    } finally {
+      await close()
+    }
   }
 
   const linkIssues = options.render ? unroutedLinks(frames, project, canvases.length ? canvases : known) : []

@@ -104,7 +104,12 @@ export function runPush(paths: DesignPaths, units: string[], options: { resolved
     const first = await push(ctx, { units, resolved: options.resolved, beforeBuild })
     if (first.ok || first.error?.code !== 'pull_first') return first
     // Someone pushed first: take their changes in (a three-way merge), then push again.
-    ctx.log('The cloud is ahead: merging its changes first…')
+    const raced = first.error.message.includes('someone pushed first')
+    ctx.log(
+      raced
+        ? 'Someone pushed while this push was uploading: merging their changes first…'
+        : 'The cloud is ahead: merging its changes first…',
+    )
     const pulled = await pull(ctx, { units: [], theirs: [] })
     if (!pulled.ok) {
       pulled.error = {
@@ -116,7 +121,7 @@ export function runPush(paths: DesignPaths, units: string[], options: { resolved
     ctx.link = readLink(paths)!
     const second = await push(ctx, { units, resolved: [], beforeBuild })
     second.hints.unshift(
-      `Merged the cloud's changes first: ${pulled.units
+      `${raced ? 'Someone pushed while this push was uploading; merged' : 'Merged'} the cloud's changes first: ${pulled.units
         .filter((entry) => entry.action !== 'up_to_date')
         .map((entry) => `${entry.unit} (${entry.action.replaceAll('_', ' ')})`)
         .join(', ')}`,
