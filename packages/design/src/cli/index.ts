@@ -1,3 +1,5 @@
+import { spawnSync } from 'node:child_process'
+import fs from 'node:fs'
 import path from 'node:path'
 import { parseArgs } from 'node:util'
 import { designPaths, findProjectRoot, packageVersion } from '../core/paths'
@@ -253,16 +255,44 @@ async function main(argv: string[]) {
   }
 }
 
-main(process.argv.slice(2)).catch((error) => {
-  endLine()
-  if (error instanceof CliError) {
-    process.stderr.write(`${red('error')} ${error.message}\n`)
-    process.exit(error.code)
+/**
+ * On Windows a CLI started through an 8.3 short path (C:\Users\RUNNER~1\…, as %TEMP% often is)
+ * keeps that form in its module paths while Vite and the project resolve the long one, and the
+ * preview then cannot serve its own client. Run once more from the real paths instead.
+ */
+function relaunchFromRealPath(): boolean {
+  if (process.platform !== 'win32' || process.env.FOSS_DESIGN_RELAUNCHED) return false
+  const script = process.argv[1]
+  if (!script) return false
+  let realScript: string
+  let realCwd: string
+  try {
+    realScript = fs.realpathSync.native(script)
+    realCwd = fs.realpathSync.native(process.cwd())
+  } catch {
+    return false
   }
-  if ((error as { code?: string }).code?.startsWith('ERR_PARSE_ARGS')) {
-    process.stderr.write(`${red('error')} ${(error as Error).message}\nRun \`design --help\`.\n`)
-    process.exit(2)
-  }
-  process.stderr.write(`${red('error')} ${(error as Error)?.stack ?? String(error)}\n`)
-  process.exit(1)
-})
+  const same = (a: string, b: string) => path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase()
+  if (same(realScript, script) && same(realCwd, process.cwd())) return false
+  const result = spawnSync(process.execPath, [...process.execArgv, realScript, ...process.argv.slice(2)], {
+    stdio: 'inherit',
+    cwd: realCwd,
+    env: { ...process.env, FOSS_DESIGN_RELAUNCHED: '1' },
+  })
+  process.exit(result.status ?? 1)
+}
+
+if (!relaunchFromRealPath())
+  main(process.argv.slice(2)).catch((error) => {
+    endLine()
+    if (error instanceof CliError) {
+      process.stderr.write(`${red('error')} ${error.message}\n`)
+      process.exit(error.code)
+    }
+    if ((error as { code?: string }).code?.startsWith('ERR_PARSE_ARGS')) {
+      process.stderr.write(`${red('error')} ${(error as Error).message}\nRun \`design --help\`.\n`)
+      process.exit(2)
+    }
+    process.stderr.write(`${red('error')} ${(error as Error)?.stack ?? String(error)}\n`)
+    process.exit(1)
+  })

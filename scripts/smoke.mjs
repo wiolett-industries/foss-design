@@ -77,6 +77,18 @@ try {
     fail(`a restart should leave one new tracked preview, got ${JSON.stringify(second)}`)
   design('stop', '--all')
   if (previews().length) fail('stop --all left previews running')
+
+  // The same project through the temp folder as Windows names it, often an 8.3 short path
+  // (RUNNER~1): the CLI has to run from the real path to serve its frames.
+  const short = path.join(os.tmpdir(), path.basename(work), 'project')
+  if (short !== project) {
+    console.log(`$ design check --render   (from ${short})`)
+    const shortCli = path.join(short, 'node_modules', 'foss-design', 'dist', 'cli.js')
+    process.stdout.write(
+      execFileSync(process.execPath, [shortCli, 'check', '--render'], { cwd: short, env, encoding: 'utf8' }),
+    )
+    design('stop', '--all')
+  }
   console.log('Smoke test passed.')
 } catch (error) {
   // Ask the server that failed directly: whose 404 it is, and what it says.
