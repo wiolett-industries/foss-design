@@ -1,17 +1,20 @@
 import type { CanvasSummary, ProjectInfo } from '@shared/types'
-import type { ReactNode } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { type ReactNode, useRef } from 'react'
 import { IssuesPanel } from '../components/issues'
 import { useProject } from '../lib/api'
 import { plural, relativeTime } from '../lib/format'
 import { useIsPhone } from '../lib/phone'
 import { useViewer } from '../lib/viewer'
 import { Badge, Count } from '../ui/badge'
-import { ButtonLink } from '../ui/button'
+import { Button, ButtonLink } from '../ui/button'
 import { Icon } from '../ui/icon'
+import { Menu, MenuItem } from '../ui/menu'
 import { Content, Notice, PageHead } from '../ui/page'
 import { KV, Panel, PanelBody, PanelHead, RowLink } from '../ui/panel'
 import { Skeleton, SkeletonRows } from '../ui/skeleton'
 import { Mono, Two } from '../ui/text'
+import { toast } from '../ui/toast'
 
 function Cover({ canvas }: { canvas: CanvasSummary }) {
   return (
@@ -22,6 +25,62 @@ function Cover({ canvas }: { canvas: CanvasSummary }) {
         <Icon name="canvas" size={18} className="text-muted" />
       )}
     </div>
+  )
+}
+
+/** The project icon beside its name, in the same tile as a canvas cover. */
+function ProjectIcon({ src }: { src: string }) {
+  return (
+    <span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-[6px] border border-rule bg-soft">
+      <img src={src} alt="" className="size-full object-contain" />
+    </span>
+  )
+}
+
+/** Set or remove the project icon, where the source can change it (the local preview). */
+function IconMenu({ project }: { project: ProjectInfo }) {
+  const { source, keys } = useViewer()
+  const queryClient = useQueryClient()
+  const input = useRef<HTMLInputElement>(null)
+  if (!source.setIcon || project.static) return null
+  const apply = async (file: File | null) => {
+    try {
+      await source.setIcon!(file)
+      await queryClient.invalidateQueries({ queryKey: keys.project })
+      toast(
+        file ? 'Icon set' : 'Icon removed',
+        file ? 'Saved as .design/system/icon; push takes it to the cloud.' : undefined,
+      )
+    } catch (error) {
+      toast('Could not change the icon', (error as Error).message, 'error')
+    }
+  }
+  return (
+    <>
+      <input
+        ref={input}
+        type="file"
+        accept=".svg,.png,.webp,image/svg+xml,image/png,image/webp"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0]
+          event.target.value = ''
+          if (file) void apply(file)
+        }}
+      />
+      <Menu trigger={<Button>Icon</Button>} align="end" width={240}>
+        <MenuItem onSelect={() => input.current?.click()} hint="≤ 256 KB">
+          <Icon name="upload" size={15} />
+          {project.icon ? 'Replace icon' : 'Upload icon'}
+        </MenuItem>
+        {project.icon ? (
+          <MenuItem danger onSelect={() => void apply(null)}>
+            <Icon name="trash" size={15} />
+            Remove icon
+          </MenuItem>
+        ) : null}
+      </Menu>
+    </>
   )
 }
 
@@ -198,9 +257,18 @@ export function HomePage() {
   return (
     <Content>
       <PageHead
-        title={project.name}
+        title={
+          project.icon ? (
+            <span className="flex min-w-0 items-center gap-3">
+              <ProjectIcon src={project.icon} />
+              {project.name}
+            </span>
+          ) : (
+            project.name
+          )
+        }
         // On a phone the actions (usually a ⋯ menu) sit at the end of the title row, not alone under it.
-        right={phone ? undefined : slots.homeActions}
+        right={phone ? undefined : (slots.homeActions ?? <IconMenu project={project} />)}
         badge={phone && slots.homeActions ? <span className="ml-auto flex">{slots.homeActions}</span> : undefined}
         sub={
           slots.homeSub ? (

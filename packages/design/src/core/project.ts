@@ -2,7 +2,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { Issue, ProjectInfo } from '../shared/types'
 import { listCanvasIds, loadCanvas, type ResolvedCanvas, summarize } from './canvas'
-import { type DesignPaths, isInside, packageVersion, relToRoot } from './paths'
+import { iconFile, iconProblem } from './icon'
+import { type DesignPaths, isInside, packageVersion, relToDesign, relToRoot } from './paths'
 import { publicFiles } from './public'
 import { type DesignConfig, DesignConfigSchema, describeZodError } from './schema'
 import type { ScreenSource, SnapshotLookup, UrlScheme } from './sources'
@@ -51,6 +52,18 @@ export class DesignProject {
         })
       }
     }
+    if (config.app !== undefined) {
+      const dir = path.resolve(this.paths.root, config.app)
+      const problem = !fs.existsSync(path.join(dir, 'node_modules'))
+        ? `no node_modules in "${config.app}"; install the app's dependencies there`
+        : isInside(this.paths.root, dir)
+          ? null
+          : `"${config.app}" is not a folder inside the project`
+      if (problem) {
+        issues.push({ severity: 'error', file: relToRoot(this.paths, file), at: 'app', message: problem })
+        config = { ...config, app: undefined }
+      }
+    }
     if (config.public !== undefined) {
       const problem = publicProblem(this.paths.root, config.public)
       if (problem) {
@@ -60,6 +73,12 @@ export class DesignProject {
     }
     this.configCache = { config, issues }
     return this.configCache
+  }
+
+  /** The app package from design.json `app`, when it is usable. */
+  appDir(): string | null {
+    const configured = this.config().config.app
+    return configured === undefined ? null : path.resolve(this.paths.root, configured)
   }
 
   /** The public folder from design.json, when it is a folder inside the project. */
@@ -138,13 +157,28 @@ export class DesignProject {
       system: system ? summarizeSystem(system) : null,
       canvases: this.canvases().map(summarize),
       issues: this.config().issues,
+      icon: this.iconUrl(),
     }
+  }
+
+  /** The icon's URL, with its change time so a new icon is fetched anew. */
+  iconUrl(): string | null {
+    const file = iconFile(this.paths)
+    if (!file) return null
+    return `${this.urls.file(relToDesign(this.paths, file))}?v=${Math.round(fs.statSync(file).mtimeMs)}`
+  }
+
+  private iconIssues(): Issue[] {
+    const file = iconFile(this.paths)
+    const problem = file ? iconProblem(fs.readFileSync(file), path.extname(file).slice(1)) : null
+    return problem ? [{ severity: 'error', file: relToRoot(this.paths, file!), message: problem }] : []
   }
 
   /** Every problem in the project, for `design check`. */
   issues(): Issue[] {
     return [
       ...this.config().issues,
+      ...this.iconIssues(),
       ...(this.system()?.doc.issues ?? []),
       ...this.canvases().flatMap((canvas) => canvas.doc.issues),
     ]

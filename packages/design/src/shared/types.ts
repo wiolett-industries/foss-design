@@ -20,6 +20,8 @@ export interface ProjectInfo {
   system: SystemSummary | null
   canvases: CanvasSummary[]
   issues: Issue[]
+  /** URL of the project icon (`.design/system/icon.*`), or null. */
+  icon?: string | null
 }
 
 export interface SystemSummary {

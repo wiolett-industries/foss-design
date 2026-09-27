@@ -28,6 +28,8 @@ export const DesignConfigSchema = z.strictObject({
   alias: z.record(z.string(), z.string()).optional(),
   /** Extra folders Tailwind scans for class names, relative to the project root. */
   sources: z.array(z.string()).optional(),
+  /** A monorepo's app package, relative to the project root: screens import its dependencies and its React. */
+  app: z.string().min(1).optional(),
   /** A folder served at the root of every screen, like Vite's `public`, relative to the project root. */
   public: z.string().min(1).optional(),
   port: z.number().int().min(1).max(65535).optional(),

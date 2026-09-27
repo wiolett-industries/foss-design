@@ -30,17 +30,18 @@ export function aliases(project: DesignProject): Alias[] {
 }
 
 /**
- * Drop the pre-bundled deps when the runtime changed since they were built.
- * Vite keys that cache on the project's lockfile and the config only, and the
- * runtime comes in through a link, so a new foss-design would keep the old copy.
+ * Drop the pre-bundled deps when the runtime or the app package changed since they were built.
+ * Vite keys that cache on the project's lockfile and the config only, and both come in through
+ * links, so a new foss-design or another design.json `app` would keep the old copies.
  */
-export function dropStaleDepCache(paths: DesignPaths) {
+export function dropStaleDepCache(paths: DesignPaths, appDir: string | null = null) {
   const dir = path.join(paths.cache, 'vite')
   const stamp = path.join(paths.cache, 'vite-runtime')
   let runtime = ''
   try {
     runtime = createHash('sha256').update(fs.readFileSync(PKG.runtime)).digest('hex')
   } catch {}
+  if (appDir) runtime += ` ${appDir}`
   let seen = ''
   try {
     seen = fs.readFileSync(stamp, 'utf8')

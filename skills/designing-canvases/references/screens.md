@@ -53,7 +53,7 @@ export default function SignUp({ error }: { error?: string }) {
 | --- | --- |
 | `react`, `react-dom` | The project's React when it has one; otherwise the copy foss-design ships. Always a single React for screens, the runtime and project components. |
 | `motion` (`motion/react`), `lucide-react`, `clsx`, `tailwind-merge` | The project's copy when present, otherwise the shipped one. |
-| Anything else in the project's `node_modules` | As usual: packages resolve by walking up from `.design`. |
+| Anything else in the project's `node_modules` | As usual: packages resolve by walking up from `.design`. In a monorepo whose app keeps its packages in its own folder (`packages/web/node_modules`), set `"app": "packages/web"` in `.design/design.json`: screens then import everything the app has, and React is the app's, one copy for screens, the runtime and the app's components. Run `design preview --restart` after changing it. |
 | `@system/...` | `.design/system/...`, for example `@system/components/button`. |
 | `@design/runtime` | The runtime API below. |
 | Aliases from `.design/design.json` | `{ "alias": { "@/": "src/", "@app": "src" } }`, paths relative to the project root. Lets screens import real project components. Run `design preview --restart` after changing it. |

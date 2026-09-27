@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import path from 'node:path'
+import { iconProblem, MAX_ICON_BYTES, writeIcon } from '../core/icon'
 import { isInside, packageVersion } from '../core/paths'
 import type { DesignProject } from '../core/project'
 import type { Theme } from '../shared/types'
@@ -83,6 +84,24 @@ export async function handleApi(
     }
     res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' })
     res.end(fs.readFileSync(file, 'utf8'))
+    return true
+  }
+  // The project icon, set from the viewer: the one project file the server writes, on the user's request.
+  if (route === '/icon' && (method === 'PUT' || method === 'DELETE')) {
+    try {
+      const body = method === 'PUT' ? await readBody(req, MAX_ICON_BYTES * 4) : null
+      const problem = body ? iconProblem(body) : null
+      if (problem) {
+        sendJson(res, 400, { error: problem })
+        return true
+      }
+      writeIcon(project.paths, body)
+      project.invalidateSystem()
+      events.send({ type: 'project' })
+      sendJson(res, 200, { icon: project.iconUrl() })
+    } catch (error) {
+      sendJson(res, 400, { error: (error as Error).message })
+    }
     return true
   }
   const snapshotPost = /^\/snapshots\/([^/]+)\/([^/]+)$/.exec(route)

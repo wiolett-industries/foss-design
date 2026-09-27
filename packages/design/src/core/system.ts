@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import type { AssetDoc, ComponentDoc, GuidelineDoc, Issue, SystemDoc, SystemSummary } from '../shared/types'
+import { onlyIcon } from './icon'
 import { type DesignPaths, relToDesign, relToRoot } from './paths'
 import { describeZodError, type SystemConfig, SystemConfigSchema } from './schema'
 import type { ScreenSource, UrlScheme } from './sources'
@@ -58,7 +59,8 @@ function guessSources(componentsDir: string, stem: string): string[] {
 }
 
 export function loadSystem(paths: DesignPaths, urls: UrlScheme): ResolvedSystem | null {
-  if (!fs.existsSync(paths.system)) return null
+  // A folder holding only the project icon is no design system.
+  if (!fs.existsSync(paths.system) || onlyIcon(paths.system)) return null
   const issues: Issue[] = []
   const configFile = path.join(paths.system, 'system.json')
   const report = (severity: Issue['severity'], file: string, message: string, at?: string) =>

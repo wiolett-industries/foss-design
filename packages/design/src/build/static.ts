@@ -145,7 +145,7 @@ export async function buildSite(paths: DesignPaths, out: string, options: BuildO
 
   const entries = new Entries(project)
   entries.sync()
-  linkShippedPackages(paths)
+  linkShippedPackages(paths, project.appDir())
   const publicDir = project.publicDir()
   const publicFiles = project.publicFiles()
 
@@ -231,6 +231,9 @@ export async function buildSite(paths: DesignPaths, out: string, options: BuildO
         for (const item of section.items) if (item.kind === 'image' && item.url.startsWith('_f/')) files.add(item.url)
   }
   for (const asset of system?.doc.assets ?? []) files.add(asset.url)
+  // The project icon goes with every build: the viewer shows it whatever the unit.
+  const icon = project.iconUrl()
+  if (icon) files.add(icon.split('?')[0]!)
   for (const url of files) {
     const rel = url.slice('_f/'.length).split('/').map(decodeURIComponent).join('/')
     const from = path.join(paths.design, rel)

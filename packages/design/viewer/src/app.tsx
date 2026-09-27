@@ -27,10 +27,18 @@ import { Toaster } from './ui/toast'
 import { TooltipProvider } from './ui/tooltip'
 
 function Title() {
-  const name = useProject().data?.name
+  const { name, icon } = useProject().data ?? {}
   useEffect(() => {
     if (name) document.title = `${name} · Design`
   }, [name])
+  // The tab shows the project's icon when it has one.
+  useEffect(() => {
+    const link = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
+    if (!link) return
+    link.dataset.fallback ??= link.getAttribute('href') ?? ''
+    link.removeAttribute('type')
+    link.href = icon || link.dataset.fallback
+  }, [icon])
   return null
 }
 

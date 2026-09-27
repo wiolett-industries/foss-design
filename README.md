@@ -51,13 +51,14 @@ Requirements: Node.js 20.19 or newer. `check --render` and `shot` use an install
 
 ```
 .design/
-  design.json                  name, import aliases, extra Tailwind sources, public folder, port
+  design.json                  name, import aliases, the app package in a monorepo, extra Tailwind sources, public folder, port
   system/
     system.json                name, description, web fonts, optional custom stylesheet
     tokens.css                 CSS variables (light, dark) and the @theme mapping to Tailwind
     components/                components screens import as @system/components/…
     specimens/                 one page per component, every variant and state
     guidelines/                Markdown pages
+    icon.svg                   the project icon (`design icon`; also .png or .webp, at most 256 KB)
     assets/                    logos, icons, fonts, imagery
   canvas/
     <canvas-id>/
@@ -103,6 +104,7 @@ The complete formats are in the skills: [canvas.json](skills/designing-canvases/
 | `design init [--name <name>] [--no-gitignore]` | Create `.design` and add it to `.gitignore`. |
 | `design system init [--name <name>] [--empty]` | Scaffold `.design/system`: tokens, a guideline, a component and its specimen. |
 | `design new <canvas> [--title <title>] [--empty]` | Scaffold `.design/canvas/<canvas>`. |
+| `design icon [<file>] [--remove]` | Show, set or remove the project icon: an SVG, PNG or WebP of at most 256 KB kept as `.design/system/icon.*`. It shows on the project in the viewer (also as the tab icon) and the cloud, syncs with the design system unit and counts toward the project's cloud storage. The local viewer sets it too (home page, Icon). |
 | `design import <folder> [--canvas <id>] [--title <title>]` | Turn an exported Claude Design project (`canvas.json` and `*.dc.html`) into a canvas, once: every template becomes a React screen (`.jsx`) with its logic and state, boards keep their pages and positions, links between boards become routes, a `theme` prop follows the viewer's switch. Files the export lacks (`/_blob/…` uploads) are listed. |
 | `design canvases [--json]` | List the canvases with pages and screens; when linked, also each one's revision, sync state, web link and public link. |
 | `design preview [--open [path]] [--port <n>] [--restart] [--foreground]` | Start the viewer in the background, or reuse the running one, and print its URL. |

@@ -23,7 +23,7 @@ This repository holds foss-design: the `foss-design` npm package (CLI, preview s
 - Keep the plugin name and version aligned in `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json` and `packages/design/package.json`.
 - Every skill folder name equals its frontmatter `name`; descriptions stay on one line.
 - No hooks: installing the plugin must not change a user's settings or run anything.
-- Screens are the user's code: the server must never modify files outside `.design/.cache` and `.design/node_modules`.
+- Screens are the user's code: the server must never modify files outside `.design/.cache` and `.design/node_modules`. The one exception is `.design/system/icon.*`, written only when the user sets or removes the icon in the viewer.
 
 ## Verify
 

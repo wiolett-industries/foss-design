@@ -24,6 +24,8 @@ export interface ViewerSource {
   system(): Promise<{ doc: SystemDoc; base: string } | null>
   /** The text of a project file; `unit` is `system` or `canvas/<id>`. */
   source(path: string, unit: string): Promise<string>
+  /** Set the project icon (an SVG, PNG or WebP), or remove it with null. Without it the viewer offers no icon controls. */
+  setIcon?(file: Blob | null): Promise<void>
 }
 
 export class ApiError extends Error {
@@ -84,6 +86,17 @@ export const localSource: ViewerSource = {
     const response = await fetch(`/api/source?path=${encodeURIComponent(path)}`, { cache: 'no-store' })
     if (!response.ok) throw new ApiError(response.status, `Could not read ${path}`)
     return response.text()
+  },
+  async setIcon(file) {
+    const response = await fetch('/api/icon', {
+      method: file ? 'PUT' : 'DELETE',
+      headers: file ? { 'content-type': file.type || 'application/octet-stream' } : undefined,
+      body: file,
+    })
+    if (!response.ok) {
+      const body = (await response.json().catch(() => ({}))) as { error?: string }
+      throw new ApiError(response.status, body.error ?? `${response.status} ${response.statusText}`)
+    }
   },
 }
 

@@ -81,11 +81,11 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
   const project = new DesignProject(paths, DEV_URLS, snapshots.lookup)
   const entries = new Entries(project)
   entries.sync()
-  const links = linkShippedPackages(paths)
+  const links = linkShippedPackages(paths, project.appDir())
   const events = new EventHub()
   const httpServer = http.createServer()
 
-  dropStaleDepCache(paths)
+  dropStaleDepCache(paths, project.appDir())
   const base = baseConfig(project)
   const vite: ViteDevServer = await createServer({
     ...base,

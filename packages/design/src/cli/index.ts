@@ -5,6 +5,7 @@ import { runBuild } from './commands/build'
 import { runArchive, runCanvases, runHistory, runMe, runPublish, runRollback, runUrl } from './commands/canvases'
 import { runCheck } from './commands/check'
 import { runLink, runLogin, runLogout } from './commands/cloud'
+import { runIcon } from './commands/icon'
 import { runImport } from './commands/import'
 import { runPreview, runStop } from './commands/preview'
 import { runInit, runNew, runSystemInit } from './commands/scaffold'
@@ -21,6 +22,9 @@ ${bold('Project')}
   init [--name <name>] [--no-gitignore]      Create .design and add it to .gitignore
   system init [--name <name>] [--empty]      Scaffold .design/system: tokens, a guideline, a component
   new <canvas> [--title <title>] [--empty]   Scaffold .design/canvas/<canvas>
+  icon [<file>] [--remove]                   Show, set or remove the project icon: an SVG, PNG or WebP of
+                                             at most 256 KB, kept as .design/system/icon.* and pushed
+                                             with the design system
   import <folder> [--canvas <id>]            Turn an exported Claude Design project (canvas.json and
          [--title <title>]                   *.dc.html) into a canvas of React screens, once
   canvases [--json]                          Every canvas: pages and screens; with a cloud link also its
@@ -102,6 +106,7 @@ async function main(argv: string[]) {
       name: { type: 'string' },
       title: { type: 'string' },
       canvas: { type: 'string' },
+      remove: { type: 'boolean' },
       'no-gitignore': { type: 'boolean' },
       empty: { type: 'boolean' },
       open: { type: 'boolean' },
@@ -145,6 +150,8 @@ async function main(argv: string[]) {
       if (!rest[0]) throw new CliError('Usage: design new <canvas> [--title <title>]')
       return runNew(projectPaths(values.root).root, rest[0], { title: values.title, empty: !!values.empty })
     }
+    case 'icon':
+      return runIcon(projectPaths(values.root), rest[0], { remove: !!values.remove })
     case 'import': {
       if (!rest[0]) throw new CliError('Usage: design import <folder> [--canvas <id>] [--title <title>]')
       return runImport(projectPaths(values.root), rest[0], { canvas: values.canvas, title: values.title })

@@ -49,7 +49,9 @@ export function runInit(root: string, options: { name?: string; gitignore: boole
     print(`  ${result === 'added' ? green('ignored') : dim('ignored')} .design/ in .gitignore`)
   }
   print()
-  print('Next: `design system init` for a design system, `design new <canvas>` for a canvas, `design preview` to look.')
+  print(
+    'Next: `design system init` for a design system, `design new <canvas>` for a canvas, `design icon <file.svg>` for the project icon, `design preview` to look.',
+  )
 }
 
 export function runSystemInit(root: string, options: { name?: string; empty: boolean }) {
