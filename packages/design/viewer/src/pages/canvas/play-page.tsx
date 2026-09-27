@@ -21,13 +21,13 @@ import { isTyping } from './viewport'
 
 type Frame = ScreenItem | UrlItem
 
-interface Entry {
+export interface Entry {
   item: Frame
   pageId: string
   where: string
 }
 
-function framesOf(canvas: CanvasDoc, pageId: string | null): Entry[] {
+export function framesOf(canvas: CanvasDoc, pageId: string | null): Entry[] {
   const pages = pageId ? canvas.pages.filter((p) => p.id === pageId) : canvas.pages
   return pages.flatMap((page) =>
     page.sections.flatMap((section) =>
@@ -42,7 +42,7 @@ function framesOf(canvas: CanvasDoc, pageId: string | null): Entry[] {
   )
 }
 
-const playHref = (canvas: string, item: string, page: string) =>
+export const playHref = (canvas: string, item: string, page: string) =>
   `/c/${encodeURIComponent(canvas)}/play/${encodeURIComponent(item)}?page=${encodeURIComponent(page)}`
 
 export function PlayPage({ canvasId, itemId }: { canvasId: string; itemId: string }) {

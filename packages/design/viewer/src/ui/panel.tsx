@@ -217,7 +217,7 @@ export function KV({
   return (
     <div
       className="grid content-center items-baseline gap-x-4 border-t border-rule px-4 py-2"
-      style={{ gridTemplateColumns: `${labelWidth}px minmax(0, 1fr)`, minHeight: minH }}
+      style={{ gridTemplateColumns: `min(${labelWidth}px, 42%) minmax(0, 1fr)`, minHeight: minH }}
     >
       <span className="text-[13px] text-muted">{label}</span>
       <div className={cn('flex min-w-0 flex-wrap items-center gap-2', end && 'justify-end')}>{children}</div>

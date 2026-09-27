@@ -117,7 +117,33 @@ export function AppTopBar() {
           {slots.barEnd}
         </div>
       </Bar>
+      <PhoneTabs location={location} />
       {slots.belowBar}
     </>
+  )
+}
+
+/** The section tabs on a phone, where the bar has no room for them: a row under it. */
+function PhoneTabs({ location }: { location: string }) {
+  return (
+    <nav className="sticky top-[52px] z-30 hidden h-10 shrink-0 items-stretch border-b border-rule bg-surface px-2 max-md:flex">
+      {TABS.map((tab) => {
+        const on = tab.match(location)
+        return (
+          <Link
+            key={tab.to}
+            href={tab.to}
+            aria-current={on ? 'page' : undefined}
+            className={cn(
+              'relative flex grow items-center justify-center text-[13.5px] no-underline',
+              on ? 'font-medium text-ink' : 'text-ink2',
+            )}
+          >
+            {tab.label}
+            {on ? <span aria-hidden className="absolute inset-x-6 bottom-0 h-[2px] rounded-full bg-action" /> : null}
+          </Link>
+        )
+      })}
+    </nav>
   )
 }

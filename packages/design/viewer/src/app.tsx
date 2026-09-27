@@ -5,6 +5,7 @@ import { Redirect, Route, Router, Switch } from 'wouter'
 import { CommandPalette } from './components/command-palette'
 import { AppTopBar } from './components/topbar'
 import { connectEvents, createQueryClient, useProject } from './lib/api'
+import { useIsPhone } from './lib/phone'
 import type { ViewerSource } from './lib/source'
 import {
   sameId,
@@ -17,6 +18,7 @@ import {
 } from './lib/viewer'
 import { CanvasPage } from './pages/canvas/canvas-page'
 import { FullPage } from './pages/canvas/full-page'
+import { PhoneCanvas } from './pages/canvas/phone-view'
 import { PlayPage } from './pages/canvas/play-page'
 import { HomePage } from './pages/home'
 import { NotFound } from './pages/not-found'
@@ -32,19 +34,30 @@ function Title() {
   return null
 }
 
+/** Screenshots (`?capture`) always get the canvas, whatever the window. */
+const CAPTURE = new URLSearchParams(window.location.search).has('capture')
+
+/** The canvas routes' pages; on a phone the canvas is one screen at a time. */
+function useCanvasPages() {
+  const phone = useIsPhone() && !CAPTURE
+  return {
+    play: (canvas: string, item: string) =>
+      phone ? <PhoneCanvas canvasId={canvas} itemId={item} /> : <PlayPage canvasId={canvas} itemId={item} />,
+    canvas: (canvas: string, page?: string) =>
+      phone ? <PhoneCanvas canvasId={canvas} pageId={page} /> : <CanvasPage canvasId={canvas} pageId={page} />,
+  }
+}
+
 function Routes() {
+  const pages = useCanvasPages()
   return (
     <Switch>
       <Route path="/c/:canvas/full/:item">
         {(params) => <FullPage canvasId={params.canvas} itemId={params.item} />}
       </Route>
-      <Route path="/c/:canvas/play/:item">
-        {(params) => <PlayPage canvasId={params.canvas} itemId={params.item} />}
-      </Route>
-      <Route path="/c/:canvas/p/:page">
-        {(params) => <CanvasPage canvasId={params.canvas} pageId={params.page} />}
-      </Route>
-      <Route path="/c/:canvas">{(params) => <CanvasPage canvasId={params.canvas} />}</Route>
+      <Route path="/c/:canvas/play/:item">{(params) => pages.play(params.canvas, params.item)}</Route>
+      <Route path="/c/:canvas/p/:page">{(params) => pages.canvas(params.canvas, params.page)}</Route>
+      <Route path="/c/:canvas">{(params) => pages.canvas(params.canvas)}</Route>
       <Route path="/system/*?">
         <AppTopBar />
         <SystemRoutes />
@@ -65,18 +78,15 @@ function Routes() {
 function ScopedRoutes({ canvas }: { canvas: string }) {
   const home = `/c/${encodeURIComponent(canvas)}`
   const guard = (param: string, page: ReactNode) => (sameId(param, canvas) ? page : <Redirect to={home} replace />)
+  const pages = useCanvasPages()
   return (
     <Switch>
       <Route path="/c/:canvas/full/:item">
         {(params) => guard(params.canvas, <FullPage canvasId={canvas} itemId={params.item} />)}
       </Route>
-      <Route path="/c/:canvas/play/:item">
-        {(params) => guard(params.canvas, <PlayPage canvasId={canvas} itemId={params.item} />)}
-      </Route>
-      <Route path="/c/:canvas/p/:page">
-        {(params) => guard(params.canvas, <CanvasPage canvasId={canvas} pageId={params.page} />)}
-      </Route>
-      <Route path="/c/:canvas">{(params) => guard(params.canvas, <CanvasPage canvasId={canvas} />)}</Route>
+      <Route path="/c/:canvas/play/:item">{(params) => guard(params.canvas, pages.play(canvas, params.item))}</Route>
+      <Route path="/c/:canvas/p/:page">{(params) => guard(params.canvas, pages.canvas(canvas, params.page))}</Route>
+      <Route path="/c/:canvas">{(params) => guard(params.canvas, pages.canvas(canvas))}</Route>
       <Route>
         <Redirect to={home} replace />
       </Route>

@@ -32,6 +32,7 @@ export { Bar } from './components/topbar'
 export { Mark, Wordmark } from './components/wordmark'
 export { cn } from './lib/cn'
 export { copyText } from './lib/copy'
+export { useIsPhone } from './lib/phone'
 export { ApiError, localSource, resolveUrl, staticSource, type ViewerSource } from './lib/source'
 export { setThemePref, type ThemePref, useTheme, useThemePref } from './lib/theme'
 export type { ViewerScope, ViewerSlots } from './lib/viewer'
@@ -68,6 +69,7 @@ export {
   Strip,
   THead,
 } from './ui/panel'
+export { Sheet } from './ui/sheet'
 export { Skeleton, SkeletonRows } from './ui/skeleton'
 export { Kbd, Mono, Muted, Two } from './ui/text'
 export { TextArea, type TextAreaProps, TextField, type TextFieldProps } from './ui/text-field'

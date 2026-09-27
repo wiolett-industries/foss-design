@@ -130,6 +130,7 @@ The complete formats are in the skills: [canvas.json](skills/designing-canvases/
 - `/c/<canvas>/play/<screen>` shows one screen with previous and next.
 - **Inspect** (the button in the top bar, or `I`) on the canvas and in play: hover a screen to see margin, padding and content, click an element for the right-hand panel — the React component that rendered it and its file, box model, layout, typography, colors, radius and shadow traced back to design tokens, Tailwind classes, attributes, children — and copy its CSS. Clicks go to the inspector, not the screen. Hold ⌘/Ctrl to highlight without switching Inspect on; click while holding to pick.
 - `/system` is the style guide.
+- On a phone (under 768px) a canvas is one screen at a time instead of a board: the screen fills the width and scrolls, the bottom bar steps through every screen and lists them by page and section, and a screen wider than the phone fits the width or shows at 100% and scrolls both ways. The canvases and the design system are tabs under the top bar.
 
 ## Cloud
 

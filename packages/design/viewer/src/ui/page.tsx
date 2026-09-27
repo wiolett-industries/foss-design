@@ -50,7 +50,7 @@ export function PageHead({
           <h1 className="m-0 text-[22px] font-semibold tracking-[-0.01em]">{title}</h1>
           {badge}
         </div>
-        {sub ? <div className="text-[13px] text-muted">{sub}</div> : null}
+        {sub ? <div className="text-[13px] [overflow-wrap:anywhere] text-muted">{sub}</div> : null}
       </div>
       {right ? <div className="flex flex-wrap items-center gap-2">{right}</div> : null}
     </div>

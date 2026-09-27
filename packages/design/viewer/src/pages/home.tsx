@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { IssuesPanel } from '../components/issues'
 import { useProject } from '../lib/api'
 import { plural, relativeTime } from '../lib/format'
+import { useIsPhone } from '../lib/phone'
 import { useViewer } from '../lib/viewer'
 import { Badge, Count } from '../ui/badge'
 import { ButtonLink } from '../ui/button'
@@ -50,6 +51,7 @@ function Foot({ children }: { children: ReactNode }) {
 
 function CanvasList({ project }: { project: ProjectInfo }) {
   const { canvasRowActions: rowActions, canvasesFoot } = useViewer().slots
+  const phone = useIsPhone()
   if (!project.canvases.length) {
     return (
       <Panel>
@@ -73,24 +75,48 @@ function CanvasList({ project }: { project: ProjectInfo }) {
         const actions = rowActions?.(canvas.id)
         return (
           <WithActions key={canvas.id} actions={actions}>
-            <RowLink
-              to={`/c/${encodeURIComponent(canvas.id)}`}
-              cols="86px minmax(0,1fr) auto auto"
-              align="llrr"
-              pad="10px 16px"
-              minH={74}
-              first={!!actions}
-            >
-              <Cover canvas={canvas} />
-              <Two top={canvas.title} bottom={<span className="truncate">{canvas.description ?? canvas.id}</span>} />
-              <span className="flex items-center gap-2 text-[12.5px] whitespace-nowrap text-muted">
-                {canvas.issues ? <Badge tone="danger">{plural(canvas.issues, 'problem')}</Badge> : null}
-                {plural(canvas.screens, 'screen')} · {plural(canvas.pages, 'page')}
-              </span>
-              <span className="w-[92px] text-[12.5px] whitespace-nowrap text-muted">
-                {relativeTime(canvas.updatedAt)}
-              </span>
-            </RowLink>
+            {phone ? (
+              <RowLink
+                to={`/c/${encodeURIComponent(canvas.id)}`}
+                cols="86px minmax(0,1fr)"
+                align="ll"
+                pad="10px 16px"
+                minH={74}
+                first={!!actions}
+              >
+                <Cover canvas={canvas} />
+                <Two
+                  top={canvas.title}
+                  bottom={
+                    <span className="flex min-w-0 items-center gap-2">
+                      {canvas.issues ? <Badge tone="danger">{plural(canvas.issues, 'problem')}</Badge> : null}
+                      <span className="truncate">
+                        {plural(canvas.screens, 'screen')} · {relativeTime(canvas.updatedAt)}
+                      </span>
+                    </span>
+                  }
+                />
+              </RowLink>
+            ) : (
+              <RowLink
+                to={`/c/${encodeURIComponent(canvas.id)}`}
+                cols="86px minmax(0,1fr) auto auto"
+                align="llrr"
+                pad="10px 16px"
+                minH={74}
+                first={!!actions}
+              >
+                <Cover canvas={canvas} />
+                <Two top={canvas.title} bottom={<span className="truncate">{canvas.description ?? canvas.id}</span>} />
+                <span className="flex items-center gap-2 text-[12.5px] whitespace-nowrap text-muted">
+                  {canvas.issues ? <Badge tone="danger">{plural(canvas.issues, 'problem')}</Badge> : null}
+                  {plural(canvas.screens, 'screen')} · {plural(canvas.pages, 'page')}
+                </span>
+                <span className="w-[92px] text-[12.5px] whitespace-nowrap text-muted">
+                  {relativeTime(canvas.updatedAt)}
+                </span>
+              </RowLink>
+            )}
           </WithActions>
         )
       })}
@@ -180,7 +206,10 @@ export function HomePage() {
             `Snapshot built with foss-design ${project.version}`
           ) : (
             <>
-              <Mono size={12.5}>{project.root}/.design</Mono> · foss-design {project.version}
+              <Mono size={12.5} wrap>
+                {project.root}/.design
+              </Mono>{' '}
+              · foss-design {project.version}
             </>
           )
         }
