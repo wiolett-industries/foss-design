@@ -78,6 +78,19 @@ function appPackages(appDir: string): Map<string, string> {
 /** Which links in `.design/node_modules` came from the app package, so a later run can take back the ones it dropped. */
 const APP_LINKS = '.foss-design-app.json'
 
+/** Point `link` at `target` unless it already resolves there; a folder the user put there stays. */
+function linkTo(link: string, target: string) {
+  let current: string | null = null
+  try {
+    current = fs.realpathSync(link)
+  } catch {}
+  if (current === target) return
+  if (isLink(link)) fs.unlinkSync(link)
+  if (fs.existsSync(link)) return
+  fs.mkdirSync(path.dirname(link), { recursive: true })
+  fs.symlinkSync(target, link, process.platform === 'win32' ? 'junction' : 'dir')
+}
+
 /**
  * Make the shipped packages resolvable from `.design` when the project does not have them,
  * through links in `.design/node_modules`. With design.json `app` (a monorepo's app package),
@@ -134,20 +147,12 @@ export function linkShippedPackages(paths: DesignPaths, appDir: string | null = 
     fs.mkdirSync(modules, { recursive: true })
     fs.writeFileSync(record, JSON.stringify(fromApp.sort()))
   }
-  // The runtime itself, as `foss-design/runtime`: always the copy this CLI ships with.
-  const self = path.join(modules, 'foss-design')
+  // The runtime (`@design/runtime`) is always the copy this CLI ships with, as `foss-design-cli`.
+  // `foss-design` itself is the app's when it has one, so its components get the kit it ships
+  // (`foss-design/viewer`); otherwise this CLI's copy too.
   const target = fs.realpathSync(PKG_ROOT)
-  let current: string | null = null
-  try {
-    current = fs.realpathSync(self)
-  } catch {}
-  if (current !== target) {
-    if (isLink(self)) fs.unlinkSync(self)
-    if (!fs.existsSync(self)) {
-      fs.mkdirSync(modules, { recursive: true })
-      fs.symlinkSync(target, self, process.platform === 'win32' ? 'junction' : 'dir')
-    }
-  }
+  linkTo(path.join(modules, 'foss-design-cli'), target)
+  if (!app.has('foss-design')) linkTo(path.join(modules, 'foss-design'), target)
   allow.add(target)
   return { linked, allow: [...allow] }
 }

@@ -15,7 +15,8 @@ export function aliases(project: DesignProject): Alias[] {
   const { paths } = project
   const list: Alias[] = [
     // A bare import, so the dev server pre-bundles the runtime with React wherever the package is installed.
-    { find: /^@design\/runtime$/, replacement: 'foss-design/runtime' },
+    // `foss-design-cli` is this CLI's own copy (links.ts); `foss-design` may be the app's.
+    { find: /^@design\/runtime$/, replacement: 'foss-design-cli/runtime' },
     { find: /^@system\//, replacement: `${toPosix(paths.system)}/` },
   ]
   for (const [key, target] of Object.entries(project.config().config.alias ?? {})) {
