@@ -45,6 +45,8 @@ export async function launchChrome(): Promise<Browser> {
 export interface FrameReport {
   errors: string[]
   ready: boolean
+  /** Holds from `holdReady()` still open when the frame gave up waiting. */
+  held?: number
 }
 
 /** Vite answers this while it bundles dependencies it just found; the page loads fine once it is done. */
@@ -93,6 +95,9 @@ export async function openFrame(
     }
     if (!errors.some((error) => OUTDATED_DEP.test(error))) break
   }
+  const held = ready
+    ? 0
+    : await page.evaluate(() => (window as { __DESIGN_HOLDS__?: number }).__DESIGN_HOLDS__ ?? 0).catch(() => 0)
   // Let entrance animations finish before anyone looks.
   await page.waitForTimeout(options.settleMs ?? 700)
   const runtimeErrors = await page
@@ -111,5 +116,5 @@ export async function openFrame(
     (error, index) =>
       error && !errors.some((other, j) => j !== index && other && other.length < error.length && error.includes(other)),
   )
-  return { errors: [...new Set(unique)], ready }
+  return { errors: [...new Set(unique)], ready, ...(held ? { held } : {}) }
 }

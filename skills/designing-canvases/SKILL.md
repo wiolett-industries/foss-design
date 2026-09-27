@@ -54,6 +54,16 @@ The viewer reloads by itself: saving a screen hot-updates its frame, and editing
 - **Long pages** (landing pages, docs, settings) use `"height": "auto"` so the frame grows to the content. Fixed frames show exactly one viewport and scroll inside.
 - **Dark mode** comes from the tokens: screens use token utilities (`bg-surface`, `text-ink`) or `dark:` variants, and the viewer's theme toggle switches every frame. Pin a screen with `"theme": "dark"` only when the design is dark-only.
 
+## The app's own screens on the canvas
+
+When the canvas shows the product as it is (to document it, review it, or start a redesign from it), the frames run the real app. Nothing is copied, exported or generated:
+
+- **One module screen mounts the app.** Alias the app's source in `.design/design.json` (`"alias": { "@/": "src/" }`), and write one screen, say `screens/App.tsx`, that mocks the app's API, puts the address at the route it gets through `props` (`history.replaceState(null, '', route)`) and renders the app's root. Every canvas item is that screen with its own `id`, `props` (`{ "route": "/orders/42", "state": "empty" }`) and, for pages, the `route` it stands for. The app's own links and router then move between frames.
+- **Data comes from fixtures next to the screen,** in the canvas folder (`screens/fixtures/`), where `design push` and `pull` carry them. Mock at the app's API client or `fetch`; MSW works too. Empty lists, errors, missing permissions and long names are fixture variants, not separate code.
+- **States that need clicks** (a dialog open, a tab picked, a form half filled) are reached by the screen itself after it mounts, with the app's handlers or `@testing-library/user-event`, inside `holdReady()`: call it before mounting and release it when the state shows. Address changes before the release stay in the frame, so a dialog variant does not jump to its page's screen. On failure release and throw: `check --render` reports the error.
+- **Files the app loads by root path** (`/logo.png`): `"public": "public"` in `design.json`.
+- **No pipelines.** Do not render the app to static HTML (jsdom, DOM snapshots, saved pages), write scripts that open frames to verify them, or keep design tooling in the product's source tree. `$D check <canvas> --render` and `$D shot` are the verification. Write `canvas.json` by hand; a small script that writes it is worth it only for dozens of screens whose list the project already has as data, and it lives in the canvas folder too.
+
 ## Links and navigation in screens
 
 Screens link exactly like the app does; nothing in a screen is there only for the canvas. What makes links work is `canvas.json`: every screen that stands for a page of the app gets that page's URL as `route`, and a link in any screen opens the screen whose route matches it, on the first click, on the canvas, in play mode, on a phone and in the cloud.
@@ -69,7 +79,7 @@ Screens link exactly like the app does; nothing in a screen is there only for th
 - **Every destination has a screen with a route, or the link is `href="#"`.** Never invent a path nothing shows.
 - **Inside one screen** (tabs, modals, filters, steps) interaction stays in React state.
 - **Variants** of a screen (states, dark, phone) usually have no route; links land on the main one.
-- **Screens exported from an app** (DOM snapshots, copied pages) keep their links as they are: give each screen its app route, and the links work.
+- **Screens that run the app** (above) keep its links and router as they are: give each screen its app route, and the links work.
 - `go()` from `@design/runtime` is gone: `$D check` reports it as an error and `$D push` refuses it. Replace each call with a link or `history.pushState` to the target's route.
 
 `$D check <canvas> --render` lists every link path that leads to no screen, grouped by path with the screens it appears in. Before handing over, fix each one: add the route to the screen that shows it, or make the link `#`.

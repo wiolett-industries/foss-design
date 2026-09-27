@@ -84,13 +84,25 @@ The viewer sets `data-theme="light"` or `data-theme="dark"` and the `dark` class
 ## Runtime API (`@design/runtime`)
 
 ```ts
-import { useTheme, useScreen } from '@design/runtime'
+import { holdReady, useTheme, useScreen } from '@design/runtime'
 ```
 
 | Export | What it does |
 | --- | --- |
 | `useTheme(): 'light' \| 'dark'` | The theme the frame is shown in; re-renders on change. |
 | `useScreen(): { canvas, id, props }` | Where this frame sits and the props `canvas.json` gave it. |
+| `holdReady(): () => void` | Keeps the frame from counting as ready until the returned function is called. |
+
+A frame is ready once it has painted: the viewer then shows it, `design check --render` and `design shot` look at it, and the viewer takes the snapshot the zoomed-out canvas and canvas cards show. A screen that takes longer (a whole app loading its data) or sets up its state after loading (opens a dialog, picks a tab) holds that moment until it is done. Call `holdReady()` while the screen loads, at the top of its module or in its first render, and call what it returns once the screen shows what it should:
+
+```tsx
+const release = holdReady()
+await startApp(root)
+await openDialog()
+release()
+```
+
+`design check --render` waits up to 20 seconds for the release and reports a hold never released. Until the frame is ready, `history.pushState` and `replaceState` stay in the frame: a screen can put the app at its route and open a dialog without the viewer moving to another screen. A hot reload that reloads the whole frame brings back the screen, not the address the app moved to. Once someone clicks or types in a frame, it takes no snapshot until it loads again, so the snapshot never shows a state a person or a test left behind. Clicks a screen makes itself (user-event opening a dialog) do not count.
 
 `go()` was removed in 0.5: `design check` reports it as an error, in screens and in the scripts beside them, and `design push` refuses canvases that use it.
 

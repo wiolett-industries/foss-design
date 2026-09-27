@@ -1,7 +1,7 @@
 /**
  * Runs inside every frame. Screens may import it as `@design/runtime`:
  *
- *   import { go, useTheme, useScreen } from '@design/runtime'
+ *   import { holdReady, useTheme, useScreen } from '@design/runtime'
  */
 import { Component, type ComponentType, type ReactNode, useSyncExternalStore } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -38,6 +38,8 @@ declare global {
   interface Window {
     __DESIGN__?: FrameConfig
     __DESIGN_READY__?: boolean
+    /** Holds from `holdReady()` not released yet; `design check` names them when a frame never gets ready. */
+    __DESIGN_HOLDS__?: number
     __DESIGN_ERRORS__?: string[]
   }
 }
@@ -46,6 +48,8 @@ const config: FrameConfig = window.__DESIGN__ ?? { key: '', canvas: '', id: '', 
 const embedded = window.parent !== window
 const query = new URLSearchParams(window.location.search)
 const capture = query.has('capture')
+/** The frame's own URL: a screen may move the address to the app's, and a reload must still find the screen. */
+const frameUrl = location.pathname + location.search + location.hash
 // Before any screen code runs: the screen's first render may already point at `/logo.png`.
 servePublicFolder(config.public)
 
@@ -171,9 +175,23 @@ function watchSize() {
   queue()
 }
 
+/**
+ * Someone clicked or typed in the frame (a person, or a test driving Chrome): what it shows now
+ * is their state, not the screen's, so no snapshot is taken until the frame loads again. Events
+ * a screen dispatches itself (user-event opening a dialog on load) are not trusted and do not count.
+ */
+let touched = false
+let inspecting = false
+
+/** The page painted; the frame is ready once every `holdReady()` is released too. */
+let loaded = false
+let signalled = false
+let holds = 0
+
 let snapshotTimer: ReturnType<typeof setTimeout> | undefined
 function scheduleSnapshot() {
-  if (!config.snapshots || !embedded || capture) return
+  // Theme switches and hot updates ask too; a frame not ready yet would snapshot its loading state.
+  if (!config.snapshots || !embedded || capture || touched || !signalled) return
   clearTimeout(snapshotTimer)
   snapshotTimer = setTimeout(() => {
     const run = () => void takeSnapshot()
@@ -183,6 +201,7 @@ function scheduleSnapshot() {
 }
 
 async function takeSnapshot() {
+  if (touched) return
   try {
     const { domToBlob } = await import('modern-screenshot')
     const width = window.innerWidth
@@ -194,7 +213,7 @@ async function takeSnapshot() {
       type: 'image/png',
       backgroundColor: getComputedStyle(document.body).backgroundColor,
     })
-    if (!blob) return
+    if (!blob || touched) return
     const [canvas, id] = [config.canvas, config.id].map(encodeURIComponent)
     await fetch(`/api/snapshots/${canvas}/${id}?theme=${theme}&height=${config.autoHeight ? height : ''}`, {
       method: 'POST',
@@ -273,10 +292,41 @@ function keepLinksInFrame() {
     const original = history[name].bind(history)
     history[name] = (data: unknown, unused: string, url?: string | URL | null) => {
       original(data, unused, url)
-      if (url === undefined || url === null) return
+      // Until the frame is ready the screen is setting itself up (its router opening the route,
+      // redirects, steps opening a dialog): those moves stay in the frame.
+      if (url === undefined || url === null || !signalled) return
       const raw = String(url)
       report(new URL(raw, location.href), false, raw, true)
     }
+  }
+}
+
+/** Ready once the page painted and every hold is released: the viewer shows the frame, checks look at it, and it snapshots. */
+function signalReady() {
+  if (signalled || !loaded || holds > 0) return
+  signalled = true
+  window.__DESIGN_READY__ = true
+  post({ type: 'ready' })
+  scheduleSnapshot()
+}
+
+/**
+ * Keep the frame from counting as ready until the returned function is called: for screens
+ * that load for a while (a whole app on fixtures) or set up their state after loading (open a
+ * dialog). Call it while the screen loads, at the top of its module or in its first render.
+ * `design check --render` waits for the release and reports a hold never released.
+ */
+export function holdReady(): () => void {
+  holds++
+  window.__DESIGN_HOLDS__ = holds
+  let released = false
+  return () => {
+    if (released) return
+    released = true
+    holds--
+    window.__DESIGN_HOLDS__ = holds
+    // Let the state the screen just set paint first.
+    requestAnimationFrame(() => requestAnimationFrame(signalReady))
   }
 }
 
@@ -302,6 +352,7 @@ export function boot() {
     } else if (data.type === 'inspect') {
       inspector ??= new FrameInspector(post)
       if (data.tokens) inspector.setTokens(data.tokens)
+      inspecting = !!data.on
       if (data.on) inspector.enable()
       else inspector.disable()
     } else if (data.type === 'inspect-select') inspector?.select(data.ref)
@@ -332,6 +383,19 @@ export function boot() {
   })
   // Holding ⌘/Ctrl inspects in the viewer, which cannot see keys pressed in here.
   const isModifier = (name: string) => name === 'Meta' || name === 'Control'
+  const touch = (event: Event) => {
+    if (!event.isTrusted || inspecting) return
+    touched = true
+    clearTimeout(snapshotTimer)
+  }
+  window.addEventListener('pointerdown', touch, true)
+  window.addEventListener(
+    'keydown',
+    (event) => {
+      if (!isModifier(event.key) && event.key !== 'Shift' && event.key !== 'Alt') touch(event)
+    },
+    true,
+  )
   window.addEventListener(
     'keydown',
     (event) => {
@@ -355,9 +419,8 @@ export function boot() {
   })
 
   const ready = () => {
-    window.__DESIGN_READY__ = true
-    post({ type: 'ready' })
-    scheduleSnapshot()
+    loaded = true
+    signalReady()
   }
   const whenBodyReady = () => {
     if (embedded) watchSize()
@@ -378,6 +441,9 @@ export function hmr(hot: HotContext | undefined) {
   hot.on('vite:afterUpdate', () => {
     post({ type: 'updated' })
     scheduleSnapshot()
+  })
+  hot.on('vite:beforeFullReload', () => {
+    History.prototype.replaceState.call(history, history.state, '', frameUrl)
   })
   hot.on('vite:error', (payload) => {
     const err = (payload as { err?: { message?: string } }).err

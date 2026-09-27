@@ -13,6 +13,7 @@ interface FrameResult {
   key: string
   url: string
   ready: boolean
+  held?: number
   errors: string[]
   /** `href`s of the links in the rendered screen, with their text. */
   links: { href: string; text: string }[]
@@ -65,7 +66,7 @@ async function renderFrames(jobs: FrameJob[]): Promise<FrameResult[]> {
       } finally {
         await page.close().catch(() => {})
       }
-      return { key: job.key, url: job.url, ready: report.ready, errors: report.errors, links }
+      return { key: job.key, url: job.url, ready: report.ready, held: report.held, errors: report.errors, links }
     })
   } finally {
     await browser.close()
@@ -113,7 +114,8 @@ export async function runCheck(paths: DesignPaths, canvases: string[], options: 
       for (const frame of frames) {
         const ok = frame.ready && !frame.errors.length
         print(`${ok ? green('✓') : red('✗')} ${frame.key} ${dim(frame.url)}`)
-        if (!frame.ready) print(`    ${red('did not finish rendering (no ready signal within 20s)')}`)
+        if (frame.held) print(`    ${red(`holdReady() was not released within 20s (${frame.held} still held)`)}`)
+        else if (!frame.ready) print(`    ${red('did not finish rendering (no ready signal within 20s)')}`)
         for (const error of frame.errors) print(`    ${red(error.split('\n')[0]!)}`)
       }
     }
