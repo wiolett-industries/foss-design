@@ -54,6 +54,24 @@ export function claimWheel(frame: HTMLIFrameElement | null) {
   sendToFrame(frame, { type: 'canvas' })
 }
 
+/**
+ * A wheel the frame had no use for (it reached its edge, or holds nothing that scrolls): scroll
+ * whatever scrolls around the frame, as the browser would if the frame's edges passed it on.
+ */
+export function scrollAround(frame: HTMLIFrameElement, delta: { deltaX: number; deltaY: number }) {
+  for (let node = frame.parentElement; node; node = node.parentElement) {
+    const style = getComputedStyle(node)
+    const scrolls = (overflow: string) => /(auto|scroll|overlay)/.test(overflow)
+    const y = scrolls(style.overflowY) && node.scrollHeight > node.clientHeight
+    const x = scrolls(style.overflowX) && node.scrollWidth > node.clientWidth
+    if (y || x) {
+      node.scrollBy({ left: x ? delta.deltaX : 0, top: y ? delta.deltaY : 0, behavior: 'instant' })
+      return
+    }
+  }
+  window.scrollBy({ left: delta.deltaX, top: delta.deltaY, behavior: 'instant' })
+}
+
 export function sendTheme(frame: HTMLIFrameElement | null, theme: Theme) {
   sendToFrame(frame, { type: 'theme', theme })
 }

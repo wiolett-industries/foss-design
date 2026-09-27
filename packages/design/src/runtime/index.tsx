@@ -367,12 +367,26 @@ export function boot() {
   window.addEventListener(
     'wheel',
     (event) => {
-      if (!embedded || !canvasHost) return
+      if (!embedded) return
       const zoom = event.ctrlKey || event.metaKey
+      const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1
+      if (!canvasHost) {
+        // Elsewhere (a system specimen in a scrolling page) a wheel with nothing left to scroll in
+        // here goes on to the page around the frame, which the frame's own edges no longer pass to.
+        if (!zoom && !canScroll(event.target, event.deltaX, event.deltaY))
+          post({
+            type: 'wheel',
+            deltaX: event.deltaX * unit,
+            deltaY: event.deltaY * unit,
+            x: event.clientX,
+            y: event.clientY,
+            zoom,
+          })
+        return
+      }
       // Pinch always zooms the canvas; a plain wheel pans it unless something under the pointer scrolls.
       if (!zoom && canScroll(event.target, event.deltaX, event.deltaY)) return
       event.preventDefault()
-      const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1
       post({
         type: 'wheel',
         deltaX: event.deltaX * unit,

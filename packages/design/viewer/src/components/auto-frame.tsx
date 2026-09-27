@@ -1,7 +1,7 @@
 import type { Theme } from '@shared/types'
 import { useEffect, useRef, useState } from 'react'
 import { cn } from '../lib/cn'
-import { frameSrc, listenToFrame, sendTheme } from '../lib/frames'
+import { frameSrc, listenToFrame, scrollAround, sendTheme } from '../lib/frames'
 import { useViewer } from '../lib/viewer'
 import { Icon } from '../ui/icon'
 
@@ -44,6 +44,7 @@ export function AutoFrame({
       else if (message.type === 'error')
         setErrors((list) => (list.includes(message.message) ? list : [...list, message.message]))
       else if (message.type === 'updated') setErrors([])
+      else if (message.type === 'wheel' && !message.zoom) scrollAround(frame, message)
     })
   }, [minHeight, url])
 
