@@ -18,14 +18,7 @@ export interface DesignPaths {
   shots: string
 }
 
-export function designPaths(given: string): DesignPaths {
-  // The real path: Windows hands out 8.3 short names (C:\Users\RUNNER~1\…) and links lead
-  // elsewhere, and Vite and Node resolve files to the long, real one, so checks that a file sits
-  // inside the project would fail against the short form.
-  let root = path.resolve(given)
-  try {
-    root = fs.realpathSync.native(root)
-  } catch {}
+export function designPaths(root: string): DesignPaths {
   const design = path.join(root, DESIGN_DIR)
   const cache = path.join(design, '.cache')
   return {

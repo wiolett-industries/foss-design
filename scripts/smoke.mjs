@@ -11,7 +11,9 @@ import { fileURLToPath } from 'node:url'
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
 const windows = process.platform === 'win32'
-const work = fs.mkdtempSync(path.join(os.tmpdir(), 'foss-design-smoke-'))
+// The temp folder's real path: on Windows %TEMP% can be an 8.3 short name (RUNNER~1), which Node
+// keeps in module paths while Vite and the project resolve the long one.
+const work = fs.mkdtempSync(path.join(fs.realpathSync.native(os.tmpdir()), 'foss-design-smoke-'))
 // A registry of its own, so previews other runs left on this machine do not count.
 const cache = path.join(work, 'cache')
 const env = { ...process.env, XDG_CACHE_HOME: cache, LOCALAPPDATA: cache, NO_COLOR: '1' }
