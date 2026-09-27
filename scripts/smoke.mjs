@@ -32,9 +32,18 @@ const cli = path.join(project, 'node_modules', 'foss-design', 'dist', 'cli.js')
 
 function design(...args) {
   console.log(`$ design ${args.join(' ')}`)
-  const out = execFileSync(process.execPath, [cli, ...args], { cwd: project, env, encoding: 'utf8' })
-  process.stdout.write(out)
-  return out
+  try {
+    const out = execFileSync(process.execPath, [cli, ...args], { cwd: project, env, encoding: 'utf8' })
+    process.stdout.write(out)
+    return out
+  } catch (error) {
+    // What the command said, and the preview server's log, which says why frames failed.
+    process.stdout.write(error.stdout ?? '')
+    process.stderr.write(error.stderr ?? '')
+    const log = path.join(project, '.design', '.cache', 'server.log')
+    if (fs.existsSync(log)) console.error(`--- .design/.cache/server.log\n${fs.readFileSync(log, 'utf8').slice(-6000)}`)
+    throw new Error(`design ${args.join(' ')} failed`)
+  }
 }
 
 const previews = () => JSON.parse(design('previews', '--json')).previews
