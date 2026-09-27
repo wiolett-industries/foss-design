@@ -144,6 +144,12 @@ function CanvasView({ canvas, page }: { canvas: CanvasDoc; page: Page | undefine
       ),
     [canvas.id, page, navigate],
   )
+  // Play in the bar and P: the selected screen, else the first one.
+  const playFromBar = useCallback(() => {
+    const id = store.get().selected
+    const target = (id && order.find((p) => p.item.id === id)) || order[0]
+    if (target) play(target.item.id)
+  }, [store, order, play])
 
   // Focus requests from ⌘K while this page is open.
   useEffect(() => {
@@ -233,6 +239,7 @@ function CanvasView({ canvas, page }: { canvas: CanvasDoc; page: Page | undefine
         else if (state.active) store.set((s) => ({ ...s, active: null }))
         else if (state.selected) store.set((s) => ({ ...s, selected: null }))
       } else if (e.key === 'i' && !mod && !e.altKey) setInspect((value) => !value)
+      else if (e.key === 'p' && !mod && !e.altKey) playFromBar()
       else if (e.shiftKey && e.code === 'Digit1') api?.fitAll()
       else if (e.shiftKey && e.code === 'Digit2' && state.selected) api?.fitItem(state.selected)
       else if (e.shiftKey && e.code === 'Digit0') api?.zoomTo(1)
@@ -266,7 +273,7 @@ function CanvasView({ canvas, page }: { canvas: CanvasDoc; page: Page | undefine
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [store, order, layout, play, canvas, page, navigate, inspectOn, inspection])
+  }, [store, order, layout, play, playFromBar, canvas, page, navigate, inspectOn, inspection])
 
   if (CAPTURE) {
     return (
@@ -297,11 +304,7 @@ function CanvasView({ canvas, page }: { canvas: CanvasDoc; page: Page | undefine
         onSidebar={setSidebar}
         inspect={inspectOn}
         onInspect={setInspect}
-        onPlay={() => {
-          const id = store.get().selected
-          const target = (id && order.find((p) => p.item.id === id)) || order[0]
-          if (target) play(target.item.id)
-        }}
+        onPlay={playFromBar}
         canPlay={order.length > 0}
       />
       <div className="flex min-h-0 grow basis-0">

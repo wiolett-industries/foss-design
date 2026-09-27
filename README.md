@@ -136,7 +136,7 @@ The complete formats are in the skills: [canvas.json](skills/designing-canvases/
 
 
 - `/` lists canvases and the design system.
-- `/c/<canvas>` is the canvas: drag or scroll to pan, pinch or ⌘/Ctrl + scroll to zoom, ⇧1 to fit. Click a screen to interact with it, Esc to leave, Enter or double-click to play it full size.
+- `/c/<canvas>` is the canvas: drag or scroll to pan, pinch or ⌘/Ctrl + scroll to zoom, ⇧1 to fit. Click a screen to interact with it, Esc to leave, Enter or double-click to play it full size; Play in the top bar (or `P`) plays the selected screen, else the first. When the top bar runs out of room, its buttons (Inspect, Play, search and the host's own, such as Share) turn into square icons with tooltips.
 
   Big canvases stay smooth: screens in view run live from 20% zoom (up to 12, a few loading at a time once the camera rests), screens you passed sleep behind a snapshot and wake without reloading, and the rest show snapshots — small ones when zoomed out, full ones up close. The dev server loads frames from the viewer's twin host (`127.0.0.1` when the viewer is on `localhost`, and the other way round), so the browser runs them in their own process and they cannot stall panning; open the viewer on either of the two for that. Zooming out stops at 10%; a page too big to see at 20% opens at its top instead of all at once.
 - `/c/<canvas>/play/<screen>` shows one screen with previous and next. Links between screens follow screen routes on the canvas, in play mode and on a phone.

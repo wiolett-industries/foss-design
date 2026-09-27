@@ -1,5 +1,5 @@
 import { motion } from 'motion/react'
-import { type ReactNode, useLayoutEffect, useRef, useState } from 'react'
+import { createContext, type ReactNode, type RefObject, useContext, useLayoutEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'wouter'
 import { useProject } from '../lib/api'
 import { cn } from '../lib/cn'
@@ -20,6 +20,55 @@ export function Bar({ children, className }: { children: ReactNode; className?: 
       {children}
     </header>
   )
+}
+
+const BarCompact = createContext(false)
+
+/**
+ * Whether the bar is short of room: its buttons show as square icons with tooltips then. Slots
+ * (Share and the like) read it to follow along.
+ */
+export function useBarCompact(): boolean {
+  return useContext(BarCompact)
+}
+
+export const BarCompactProvider = BarCompact.Provider
+
+/**
+ * Measures a bar: `title` holds text that truncates (`data-fit` on each truncating element),
+ * `end` the buttons. Compact once the title has to truncate; full again once the buttons at full
+ * width fit in the room the title leaves. The full width is remembered from the last time the
+ * buttons had it, so the bar does not flip back and forth.
+ */
+export function useFitBar(title: RefObject<HTMLElement | null>, end: RefObject<HTMLElement | null>, deps: unknown[]) {
+  const [compact, setCompact] = useState(false)
+  const fullEnd = useRef(0)
+  useLayoutEffect(() => {
+    const titleEl = title.current
+    const endEl = end.current
+    if (!titleEl || !endEl) return
+    const measure = () => {
+      const clipped = [...titleEl.querySelectorAll<HTMLElement>('[data-fit]')].reduce(
+        (sum, el) => sum + Math.max(0, el.scrollWidth - el.clientWidth),
+        0,
+      )
+      const free = endEl.getBoundingClientRect().left - titleEl.getBoundingClientRect().right
+      setCompact((was) => {
+        if (!was) {
+          fullEnd.current = endEl.offsetWidth
+          return clipped > 0
+        }
+        return free - clipped < fullEnd.current - endEl.offsetWidth + 16
+      })
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(titleEl.parentElement ?? titleEl)
+    observer.observe(endEl)
+    return () => observer.disconnect()
+    // biome-ignore lint/correctness/useExhaustiveDependencies: re-measure when the texts change
+  }, deps)
+  return compact
 }
 
 const TABS = [

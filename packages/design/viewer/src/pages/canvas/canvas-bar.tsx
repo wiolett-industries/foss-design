@@ -1,9 +1,11 @@
 import type { CanvasDoc, CanvasItem, CanvasPage as Page, Theme } from '@shared/types'
+import { useRef } from 'react'
 import { Link, useLocation } from 'wouter'
 import { SearchButton } from '../../components/search-button'
 import { ThemeMenu } from '../../components/theme-menu'
-import { Bar } from '../../components/topbar'
+import { Bar, BarCompactProvider, useFitBar } from '../../components/topbar'
 import { Mark } from '../../components/wordmark'
+import { cn } from '../../lib/cn'
 import { copyText } from '../../lib/copy'
 import { reloadFrame } from '../../lib/frames'
 import { useStore } from '../../lib/store'
@@ -44,8 +46,12 @@ export function CanvasBar({
 }) {
   const [, navigate] = useLocation()
   const { slots, scope } = useViewer()
+  const titleRef = useRef<HTMLDivElement>(null)
+  const endRef = useRef<HTMLDivElement>(null)
+  // Short of room, the buttons turn into square icons with tooltips (slots follow via useBarCompact).
+  const compact = useFitBar(titleRef, endRef, [canvas.title, page?.title, canvas.pages.length])
   return (
-    <>
+    <BarCompactProvider value={compact}>
       <Bar>
         {slots.barStart}
         {slots.brand ? (
@@ -64,8 +70,10 @@ export function CanvasBar({
           label={sidebar ? 'Hide sidebar (⌘\\)' : 'Show sidebar (⌘\\)'}
           onClick={() => onSidebar(!sidebar)}
         />
-        <div className="flex min-w-0 items-center gap-1.5 text-[14px]">
-          <span className="truncate font-semibold">{canvas.title}</span>
+        <div ref={titleRef} className="flex min-w-0 items-center gap-1.5 text-[14px]">
+          <span data-fit className="truncate font-semibold">
+            {canvas.title}
+          </span>
           {page && canvas.pages.length > 1 ? (
             <>
               <Icon name="chevron-right" size={14} className="shrink-0 text-muted" />
@@ -76,7 +84,9 @@ export function CanvasBar({
                     type="button"
                     className="flex h-ctrl cursor-pointer items-center gap-1 rounded-[6px] border-0 bg-transparent px-2 text-[14px] text-ink2 hover:bg-soft2"
                   >
-                    <span className="truncate">{page.title}</span>
+                    <span data-fit className="truncate">
+                      {page.title}
+                    </span>
                     <Icon name="chevron-down" size={14} className="text-muted" />
                   </button>
                 }
@@ -92,7 +102,7 @@ export function CanvasBar({
             </>
           ) : null}
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div ref={endRef} className="ml-auto flex shrink-0 items-center gap-2">
           <Segmented
             label="Screen theme"
             value={theme}
@@ -102,17 +112,32 @@ export function CanvasBar({
               { value: 'dark', label: <Icon name="moon" size={15} />, title: 'Dark screens' },
             ]}
           />
-          <InspectToggle on={inspect} onChange={onInspect} />
-          <Button kind="secondary" icon="play" onClick={onPlay} disabled={!canPlay}>
-            Play
-          </Button>
-          <SearchButton width={200} label="Search" />
+          <InspectToggle on={inspect} onChange={onInspect} compact={compact} />
+          <Tooltip
+            content={
+              <span className="flex items-center gap-1.5">
+                Play <Kbd>P</Kbd>
+              </span>
+            }
+          >
+            <Button
+              kind="secondary"
+              icon="play"
+              onClick={onPlay}
+              disabled={!canPlay}
+              aria-label="Play"
+              className={compact ? 'w-ctrl px-0' : undefined}
+            >
+              {compact ? null : 'Play'}
+            </Button>
+          </Tooltip>
+          <SearchButton width={180} label="Search" compact={compact} />
           <ThemeMenu />
           {slots.barEnd}
         </div>
       </Bar>
       {slots.belowBar ? <div className="shrink-0">{slots.belowBar}</div> : null}
-    </>
+    </BarCompactProvider>
   )
 }
 
@@ -224,7 +249,16 @@ export function SelectionBar({
 }
 
 /** The inspect mode switch: a button that stays pressed while on. */
-export function InspectToggle({ on, onChange }: { on: boolean; onChange(value: boolean): void }) {
+export function InspectToggle({
+  on,
+  onChange,
+  compact = false,
+}: {
+  on: boolean
+  onChange(value: boolean): void
+  /** A square icon; the tooltip names it. */
+  compact?: boolean
+}) {
   return (
     <Tooltip
       content={
@@ -236,15 +270,16 @@ export function InspectToggle({ on, onChange }: { on: boolean; onChange(value: b
       <button
         type="button"
         aria-pressed={on}
+        aria-label="Inspect elements"
         onClick={() => onChange(!on)}
-        className={
-          on
-            ? 'inline-flex h-ctrl cursor-pointer items-center gap-1.5 rounded-[6px] border border-action-line bg-action-soft px-ctrl text-ctrl font-medium text-action'
-            : 'inline-flex h-ctrl cursor-pointer items-center gap-1.5 rounded-[6px] border border-rule-strong bg-surface px-ctrl text-ctrl font-medium text-ink hover:bg-soft'
-        }
+        className={cn(
+          'inline-flex h-ctrl shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-[6px] border text-ctrl font-medium',
+          compact ? 'w-ctrl px-0' : 'px-ctrl',
+          on ? 'border-action-line bg-action-soft text-action' : 'border-rule-strong bg-surface text-ink hover:bg-soft',
+        )}
       >
         <Icon name="pointer" size={15} />
-        Inspect
+        {compact ? null : 'Inspect'}
       </button>
     </Tooltip>
   )

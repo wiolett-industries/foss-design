@@ -28,7 +28,7 @@ export type {
 export { DesignViewer, type DesignViewerProps } from './app'
 export { SlidePanel } from './components/slide-panel'
 export { ThemeMenu } from './components/theme-menu'
-export { Bar } from './components/topbar'
+export { Bar, useBarCompact } from './components/topbar'
 export { Mark, Wordmark } from './components/wordmark'
 export { cn } from './lib/cn'
 export { copyText } from './lib/copy'
