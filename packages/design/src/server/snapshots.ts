@@ -60,6 +60,12 @@ export class SnapshotStore {
     return { urls, thumbs, height: entry.height }
   }
 
+  /** When the snapshot was taken (ms), or null without one. */
+  version(canvas: string, id: string, theme: Theme): number | null {
+    if (!isSafeSegment(canvas) || !isSafeSegment(id)) return null
+    return this.load(canvas)[id]?.[theme] ?? null
+  }
+
   save(canvas: string, id: string, theme: Theme, png: Buffer, height?: number): { url: string } {
     if (!isSafeSegment(canvas) || !isSafeSegment(id)) throw new Error('bad snapshot key')
     const dir = path.join(this.dir, canvas)

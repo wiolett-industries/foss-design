@@ -1,10 +1,12 @@
+import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import type { DesignPaths } from './paths'
 
 /**
- * The project's icon: `.design/system/icon.svg`, `.png` or `.webp`, a plain file of the `system`
- * unit, so it syncs with the project and counts toward its cloud storage like any other file.
+ * The project's icon: `.design/icon.svg`, `.png` or `.webp`. It belongs to the project, not to a
+ * canvas or the design system: no unit carries it. A linked project keeps it in the cloud (where it
+ * counts toward storage) and this file is the copy there, synced by `design push`, `pull` and `status`.
  */
 export const ICON_EXTENSIONS = ['svg', 'png', 'webp'] as const
 export type IconExtension = (typeof ICON_EXTENSIONS)[number]
@@ -15,8 +17,9 @@ export const iconName = (ext: IconExtension) => `icon.${ext}`
 
 /** The icon file in use (svg before png before webp), or null. */
 export function iconFile(paths: DesignPaths): string | null {
+  migrateIcon(paths)
   for (const ext of ICON_EXTENSIONS) {
-    const file = path.join(paths.system, iconName(ext))
+    const file = path.join(paths.design, iconName(ext))
     if (fs.existsSync(file) && fs.statSync(file).isFile()) return file
   }
   return null
@@ -46,23 +49,34 @@ export function iconProblem(data: Buffer, ext?: string): string | null {
 
 /** Replace the icon (any other `icon.*` goes), or remove it with null. */
 export function writeIcon(paths: DesignPaths, data: Buffer | null): string | null {
-  for (const ext of ICON_EXTENSIONS) fs.rmSync(path.join(paths.system, iconName(ext)), { force: true })
+  for (const ext of ICON_EXTENSIONS) fs.rmSync(path.join(paths.design, iconName(ext)), { force: true })
   if (!data) return null
   const ext = sniffIcon(data)!
-  fs.mkdirSync(paths.system, { recursive: true })
-  const file = path.join(paths.system, iconName(ext))
+  fs.mkdirSync(paths.design, { recursive: true })
+  const file = path.join(paths.design, iconName(ext))
   fs.writeFileSync(file, data)
   return file
 }
 
-/** Whether the system folder holds nothing but the icon: then the project has no design system. */
-export function onlyIcon(dir: string): boolean {
-  try {
-    return fs
-      .readdirSync(dir)
-      .filter((name) => !name.startsWith('.'))
-      .every((name) => (ICON_EXTENSIONS as readonly string[]).some((ext) => name === iconName(ext as IconExtension)))
-  } catch {
-    return false
+/** foss-design 0.8 kept the icon in `.design/system/`; it moves up to `.design/` once. */
+function migrateIcon(paths: DesignPaths) {
+  for (const ext of ICON_EXTENSIONS) {
+    const old = path.join(paths.system, iconName(ext))
+    if (!fs.existsSync(old)) continue
+    const target = path.join(paths.design, iconName(ext))
+    if (ICON_EXTENSIONS.some((other) => fs.existsSync(path.join(paths.design, iconName(other))))) fs.rmSync(old)
+    else fs.renameSync(old, target)
   }
+  try {
+    // A system folder the icon alone made goes with it.
+    fs.rmdirSync(paths.system)
+  } catch {}
+}
+
+export const iconHash = (file: string) => createHash('sha256').update(fs.readFileSync(file)).digest('hex')
+
+export const ICON_TYPES: Record<IconExtension, string> = {
+  svg: 'image/svg+xml',
+  png: 'image/png',
+  webp: 'image/webp',
 }

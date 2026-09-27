@@ -36,8 +36,8 @@ export interface LocalScan {
   notSynced: string[]
 }
 
-/** Top-level names in `.design` that are not "not synced" even though no unit carries them. */
-const LOCAL_ONLY = new Set(['cloud.json', 'node_modules'])
+/** Top-level names in `.design` that are not "not synced" even though no unit carries them (the icon syncs as project metadata). */
+const LOCAL_ONLY = new Set(['cloud.json', 'node_modules', 'icon.svg', 'icon.png', 'icon.webp'])
 
 export const canvasUnit = (id: string) => `${CANVAS_PREFIX}${id}`
 

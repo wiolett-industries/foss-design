@@ -17,6 +17,7 @@ export type UnitAction =
   | 'kept'
   | 'up_to_date'
   | 'local_only'
+  | 'merged'
   // both
   | 'archived'
   | 'banned'
@@ -32,8 +33,10 @@ export interface UnitReport {
   baseRev?: number
   /** Head in the cloud, where it matters (remote_ahead, conflict). */
   headRev?: number
-  /** Files written, changed and deleted here (pull). */
-  files?: { added: number; changed: number; removed: number }
+  /** Files written, changed and deleted here (pull), and merged line by line. */
+  files?: { added: number; changed: number; removed: number; merged?: number }
+  /** Files a merge left in conflict, for `design merge`. */
+  conflicts?: { path: string; kind: string }[]
   /** Where the cloud version of a conflicting unit was written. */
   incoming?: string
   /** The unit in the web app, for units that are in the cloud after the command. */

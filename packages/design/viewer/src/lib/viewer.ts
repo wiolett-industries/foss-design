@@ -25,7 +25,9 @@ export interface ViewerSlots {
   canvasRowActions?: (canvasId: string) => ReactNode
   /** A strip under the canvas list on the home page: how canvases get there. */
   canvasesFoot?: ReactNode
-  /** Below the panels of the home page. */
+  /** Under the canvas list on the home page, in its column: archived canvases, say. */
+  canvasesAfter?: ReactNode
+  /** Below the panels of the home page, full width. */
   homeAfter?: ReactNode
 }
 

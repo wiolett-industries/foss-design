@@ -27,6 +27,8 @@ export interface RemoteProject {
   role: string
   archived: boolean
   banned: boolean
+  /** sha256 of the project icon, or null without one. */
+  icon: string | null
 }
 
 export interface RemoteUnit {
@@ -150,6 +152,7 @@ function parseProject(value: unknown, fallbackRole: string): RemoteProject | nul
     role: text(data.role) ?? fallbackRole,
     archived: flag(data.archived, data.archivedAt, data.archived_at),
     banned: flag(data.banned, data.bannedAt, data.banned_at),
+    icon: /[?&]v=([0-9a-f]{64})/.exec(text(data.icon) ?? '')?.[1] ?? null,
   }
 }
 
@@ -303,6 +306,38 @@ export class CloudClient {
     const project = parseProject(body.project ?? body, 'owner')
     if (!project) throw new CloudError(`${this.host} did not return the new project`, 0, 'bad_response')
     return project
+  }
+
+  /** One of the caller's projects, from the project list; null when it is not among them. */
+  async project(projectId: string): Promise<RemoteProject | null> {
+    const { owned, shared } = await this.projects()
+    return [...owned, ...shared].find((item) => item.id === projectId) ?? null
+  }
+
+  /** PATCH /projects/:id: the owner renames the project. */
+  async renameProject(projectId: string, name: string): Promise<RemoteProject> {
+    const body = record(await this.request('PATCH', `/projects/${projectId}`, { name }))
+    const project = parseProject(body.project, 'owner')
+    if (!project) throw new CloudError(`${this.host} sent no project back`, 0, 'bad_response')
+    return project
+  }
+
+  /** GET /projects/:id/icon: the icon's bytes and type, or null without one. */
+  async projectIcon(projectId: string): Promise<{ data: Buffer; type: string } | null> {
+    const response = await this.send('GET', `/projects/${projectId}/icon`, { timeout: JSON_TIMEOUT })
+    if (response.status === 404) return null
+    if (!response.ok) await this.fail(response)
+    return { data: Buffer.from(await response.arrayBuffer()), type: response.headers.get('content-type') ?? '' }
+  }
+
+  /** PUT or DELETE /projects/:id/icon (owner and editors). */
+  async setProjectIcon(projectId: string, icon: { data: Buffer; type: string } | null): Promise<void> {
+    const response = await this.send(icon ? 'PUT' : 'DELETE', `/projects/${projectId}/icon`, {
+      body: icon ? new Uint8Array(icon.data) : undefined,
+      type: icon?.type,
+      timeout: JSON_TIMEOUT,
+    })
+    if (!response.ok) await this.fail(response)
   }
 
   async units(projectId: string): Promise<Map<string, RemoteUnit>> {

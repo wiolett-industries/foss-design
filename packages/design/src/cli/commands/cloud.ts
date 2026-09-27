@@ -9,6 +9,7 @@ import {
   requireCredential,
   saveCredential,
 } from '../../cloud/credentials'
+import { syncProjectMeta } from '../../cloud/meta'
 import { allUnitKeys, cloudCache, readLink, unitStatus, writeLink } from '../../cloud/state'
 import { plural } from '../../cloud/sync'
 import { scanLocal } from '../../cloud/units'
@@ -139,6 +140,8 @@ export async function runLink(paths: DesignPaths, wanted: string | undefined, op
   if (project.archived) print(yellow('The project is archived: unarchive it in the web app before pushing or pulling.'))
 
   const link = readLink(paths)!
+  for (const line of await syncProjectMeta(paths, client, link)) print(dim(line))
+  writeLink(paths, link)
   const remote = project.archived ? null : await client.units(project.id)
   const scan = scanLocal(paths)
   const states = allUnitKeys(link, scan.units, remote).map(

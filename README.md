@@ -52,13 +52,13 @@ Requirements: Node.js 20.19 or newer. `check --render` and `shot` use an install
 ```
 .design/
   design.json                  name, import aliases, the app package in a monorepo, extra Tailwind sources, public folder, port
+  icon.svg                     the project icon (`design icon`; also .png or .webp, at most 256 KB)
   system/
     system.json                name, description, web fonts, optional custom stylesheet
     tokens.css                 CSS variables (light, dark) and the @theme mapping to Tailwind
     components/                components screens import as @system/components/…
     specimens/                 one page per component, every variant and state
     guidelines/                Markdown pages
-    icon.svg                   the project icon (`design icon`; also .png or .webp, at most 256 KB)
     assets/                    logos, icons, fonts, imagery
   canvas/
     <canvas-id>/
@@ -104,7 +104,8 @@ The complete formats are in the skills: [canvas.json](skills/designing-canvases/
 | `design init [--name <name>] [--no-gitignore]` | Create `.design` and add it to `.gitignore`. |
 | `design system init [--name <name>] [--empty]` | Scaffold `.design/system`: tokens, a guideline, a component and its specimen. |
 | `design new <canvas> [--title <title>] [--empty]` | Scaffold `.design/canvas/<canvas>`. |
-| `design icon [<file>] [--remove]` | Show, set or remove the project icon: an SVG, PNG or WebP of at most 256 KB kept as `.design/system/icon.*`. It shows on the project in the viewer (also as the tab icon) and the cloud, syncs with the design system unit and counts toward the project's cloud storage. The local viewer sets it too (home page, Icon). |
+| `design icon [<file>] [--remove]` | Show, set or remove the project icon: an SVG, PNG or WebP of at most 256 KB in `.design/icon.*`. It belongs to the project, not to a canvas: a linked project's icon is the cloud project's (set there at once, counted in its storage, copied into every checkout on push and pull). The viewer shows it on the home page and as the tab icon, and sets it too. |
+| `design rename <name>` | Rename the project: the cloud project when linked (owner only; every checkout goes by the cloud name), otherwise `name` in `design.json`. |
 | `design import <folder> [--canvas <id>] [--title <title>]` | Turn an exported Claude Design project (`canvas.json` and `*.dc.html`) into a canvas, once: every template becomes a React screen (`.jsx`) with its logic and state, boards keep their pages and positions, links between boards become routes, a `theme` prop follows the viewer's switch. Files the export lacks (`/_blob/…` uploads) are listed. |
 | `design canvases [--json]` | List the canvases with pages and screens; when linked, also each one's revision, sync state, web link and public link. |
 | `design preview [--open [path]] [--port <n>] [--restart] [--foreground]` | Start the viewer in the background, or reuse the running one, and print its URL. |
@@ -116,8 +117,9 @@ The complete formats are in the skills: [canvas.json](skills/designing-canvases/
 | `design login` / `design logout` | Sign this machine in to [foss-design Cloud](#cloud) or forget its token. |
 | `design me [--json]` | The signed-in cloud account: plan and its end date, storage, active projects, canvases, pushes, and the linked project. |
 | `design link [<project>] [--new <name>]` | List your cloud projects, or link `.design` to one (or to a new one). |
-| `design push [canvas…] [--resolved <unit>] [--json]` | Build and upload what changed, with progress, then print the web link of each pushed canvas; stops when the cloud is ahead. |
-| `design pull [canvas…] [--theirs <unit>] [--json]` | Take cloud changes; a unit changed on both sides becomes a conflict (exit 2). |
+| `design push [canvas…] [--resolved <unit>] [--json]` | Build and upload what changed, with progress, then print the web link of each pushed canvas. When the cloud is ahead it pulls and merges first and pushes on a clean merge; it stops on conflicts. Refreshes each pushed canvas's cover snapshot (Chrome). |
+| `design pull [canvas…] [--theirs <unit>] [--json]` | Take cloud changes. A unit changed on both sides merges three ways against the last synced revision: a file changed on one side takes it, text changed on both merges line by line; what does not merge is a conflict (exit 2) for `design merge`. |
+| `design merge [<unit\|file>…] [--here\|--cloud] [--done] [--json]` | The conflicts a merge left: lists them (and in a terminal walks through them: keep here, take the cloud's, edit, skip); `--here` / `--cloud` settles files or whole units; `--done` closes a merge once no conflict markers are left. Every side stays in `.design/.cache/cloud/merge/` until then. |
 | `design url <canvas> [--json]` | The canvas in the web app, and its public link when published. |
 | `design history <canvas\|system> [--json]` | Stored revisions, newest first: when, who, screens, size. |
 | `design rollback <canvas> <rev>` | Make an old revision current again in the cloud (as a new revision), then pull it. |
@@ -144,7 +146,7 @@ The complete formats are in the skills: [canvas.json](skills/designing-canvases/
 
 ## Cloud
 
-[foss-design Cloud](https://fossdesign.dev) keeps a copy of the `.design` folder: push from one checkout and pull into another, invite editors and viewers, publish a canvas by link. The skill offers the free cloud once to a project that is not linked, and a linked project gets its work handed over as cloud links (`design push`) instead of a local viewer that is not running. Screens are built on your machine; a canvas changed on both sides lands in `.design/.cache/cloud/incoming/` to merge. Pulled screens run in your local viewer, so invite as editors only people you trust.
+[foss-design Cloud](https://fossdesign.dev) keeps a copy of the `.design` folder: push from one checkout and pull into another, invite editors and viewers, publish a canvas by link. The skill offers the free cloud once to a project that is not linked, and a linked project gets its work handed over as cloud links (`design push`) instead of a local viewer that is not running. Screens are built on your machine; a canvas changed on both sides merges three ways on pull (and on push when someone pushed first), and `design merge` settles what does not. Pulled screens run in your local viewer, so invite as editors only people you trust.
 
 ```bash
 design login               # prints a link with the code in it; open it and confirm

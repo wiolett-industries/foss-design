@@ -129,6 +129,8 @@ export interface CanvasDoc {
   title: string
   description?: string
   theme?: Theme
+  /** canvas.json `cover`: the screen whose snapshot pictures the canvas, or an image's URL. */
+  cover?: { screen: string } | { url: string }
   pages: CanvasPage[]
   issues: Issue[]
   updatedAt: number

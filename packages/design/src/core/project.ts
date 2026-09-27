@@ -104,6 +104,11 @@ export class DesignProject {
   }
 
   name(): string {
+    // A linked project goes by its cloud name, as of the last sync.
+    try {
+      const linked = JSON.parse(fs.readFileSync(path.join(this.paths.design, 'cloud.json'), 'utf8')).name
+      if (typeof linked === 'string' && linked) return linked
+    } catch {}
     const configured = this.config().config.name
     if (configured) return configured
     try {

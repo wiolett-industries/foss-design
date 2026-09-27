@@ -7,7 +7,9 @@ import { runCheck } from './commands/check'
 import { runLink, runLogin, runLogout } from './commands/cloud'
 import { runIcon } from './commands/icon'
 import { runImport } from './commands/import'
+import { runMerge } from './commands/merge'
 import { runPreview, runStop } from './commands/preview'
+import { runRename } from './commands/rename'
 import { runInit, runNew, runSystemInit } from './commands/scaffold'
 import { runShot } from './commands/shot'
 import { runStatus } from './commands/status'
@@ -23,8 +25,10 @@ ${bold('Project')}
   system init [--name <name>] [--empty]      Scaffold .design/system: tokens, a guideline, a component
   new <canvas> [--title <title>] [--empty]   Scaffold .design/canvas/<canvas>
   icon [<file>] [--remove]                   Show, set or remove the project icon: an SVG, PNG or WebP of
-                                             at most 256 KB, kept as .design/system/icon.* and pushed
-                                             with the design system
+                                             at most 256 KB in .design/icon.*; a linked project's icon is
+                                             the cloud project's, set there at once
+  rename <name>                              Rename the project: the cloud project when linked (owner),
+                                             otherwise the name in design.json
   import <folder> [--canvas <id>]            Turn an exported Claude Design project (canvas.json and
          [--title <title>]                   *.dc.html) into a canvas of React screens, once
   canvases [--json]                          Every canvas: pages and screens; with a cloud link also its
@@ -60,13 +64,19 @@ ${bold('Cloud')}  ${dim('units: system (design.json + system/) and canvas/<id>; 
   link [<project>] [--new <name>]            No args: list your projects. Link .design to a cloud project
                                              (linking to another project replaces the link)
   push [canvas…] [--json]                    Build and upload what changed here (or the named units); a
-       [--resolved <unit>]                   system change pushes every active canvas with it. Stops if
-                                             the cloud is ahead; --resolved marks a merged conflict.
+       [--resolved <unit>]                   system change pushes every active canvas with it. When the
+                                             cloud is ahead it pulls and merges first, then pushes; it
+                                             stops on conflicts. Refreshes each canvas's cover snapshot.
                                              Prints the web link of every pushed canvas; refuses screens
                                              that still call go()
   pull [canvas…] [--json]                    Take cloud changes into .design; a unit changed on both sides
-       [--theirs <unit>]                     goes to .design/.cache/cloud/incoming/<unit> (exit 2);
-                                             --theirs takes the cloud version and drops local changes
+       [--theirs <unit>]                     is merged three ways (files changed on one side take it,
+                                             text changed on both merges line by line); what does not
+                                             merge waits for design merge. --theirs takes the cloud
+                                             version and drops local changes
+  merge [<unit|file>…] [--here|--cloud]      Conflicts a merge left: lists them (in a terminal, walks
+        [--done] [--json]                    through them); --here / --cloud settles files or units;
+                                             --done closes a merge once no markers are left
   url <canvas> [--json]                      The canvas in the web app, and its public link if published
   history <canvas|system> [--json]           Stored revisions, newest first: when, who, screens, size
   rollback <canvas> <rev>                    Make an old revision current again in the cloud (a new
@@ -107,6 +117,9 @@ async function main(argv: string[]) {
       title: { type: 'string' },
       canvas: { type: 'string' },
       remove: { type: 'boolean' },
+      here: { type: 'boolean' },
+      cloud: { type: 'boolean' },
+      done: { type: 'boolean' },
       'no-gitignore': { type: 'boolean' },
       empty: { type: 'boolean' },
       open: { type: 'boolean' },
@@ -152,6 +165,16 @@ async function main(argv: string[]) {
     }
     case 'icon':
       return runIcon(projectPaths(values.root), rest[0], { remove: !!values.remove })
+    case 'rename':
+      if (!rest.length) throw new CliError('Usage: design rename <name>')
+      return runRename(projectPaths(values.root), rest.join(' '))
+    case 'merge':
+      return runMerge(projectPaths(values.root), rest, {
+        here: !!values.here,
+        cloud: !!values.cloud,
+        done: !!values.done,
+        json: !!values.json,
+      })
     case 'import': {
       if (!rest[0]) throw new CliError('Usage: design import <folder> [--canvas <id>] [--title <title>]')
       return runImport(projectPaths(values.root), rest[0], { canvas: values.canvas, title: values.title })

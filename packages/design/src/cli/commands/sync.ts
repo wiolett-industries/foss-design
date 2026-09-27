@@ -1,3 +1,4 @@
+import { refreshCovers } from '../../capture/cover'
 import { CloudError } from '../../cloud/client'
 import { pull } from '../../cloud/pull'
 import { push } from '../../cloud/push'
@@ -5,6 +6,7 @@ import { readLink } from '../../cloud/state'
 import { openSync, plural, type SyncContext, type SyncReport, type UnitReport, webUrl } from '../../cloud/sync'
 import type { DesignPaths } from '../../core/paths'
 import { bold, CliError, dim, green, print, progress, red, yellow } from '../log'
+import { ensureServer } from './preview'
 
 const GOOD = new Set<UnitReport['action']>(['pushed', 'created', 'updated', 'deleted'])
 const BAD = new Set<UnitReport['action']>(['conflict', 'remote_ahead'])
@@ -95,7 +97,32 @@ async function runSync(
 }
 
 export function runPush(paths: DesignPaths, units: string[], options: { resolved: string[]; json: boolean }) {
-  return runSync(paths, 'push', options.json, (ctx) => push(ctx, { units, resolved: options.resolved }))
+  // Each pushed canvas's cover gets a current snapshot, through the preview server and Chrome.
+  const beforeBuild = (canvasIds: string[]) =>
+    refreshCovers(paths, canvasIds, async () => `http://127.0.0.1:${(await ensureServer(paths, {})).port}`)
+  return runSync(paths, 'push', options.json, async (ctx) => {
+    const first = await push(ctx, { units, resolved: options.resolved, beforeBuild })
+    if (first.ok || first.error?.code !== 'pull_first') return first
+    // Someone pushed first: take their changes in (a three-way merge), then push again.
+    ctx.log('The cloud is ahead: merging its changes first…')
+    const pulled = await pull(ctx, { units: [], theirs: [] })
+    if (!pulled.ok) {
+      pulled.error = {
+        code: pulled.error?.code ?? 'conflict',
+        message: `Nothing was pushed: ${pulled.error?.message ?? 'the pull did not finish'}`,
+      }
+      return pulled
+    }
+    ctx.link = readLink(paths)!
+    const second = await push(ctx, { units, resolved: [], beforeBuild })
+    second.hints.unshift(
+      `Merged the cloud's changes first: ${pulled.units
+        .filter((entry) => entry.action !== 'up_to_date')
+        .map((entry) => `${entry.unit} (${entry.action.replaceAll('_', ' ')})`)
+        .join(', ')}`,
+    )
+    return second
+  })
 }
 
 export function runPull(paths: DesignPaths, units: string[], options: { theirs: string[]; json: boolean }) {

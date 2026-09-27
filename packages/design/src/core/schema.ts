@@ -132,6 +132,8 @@ export const CanvasSchema = z.strictObject({
   system: z.boolean().optional(),
   /** Theme screens open in (default follows the viewer). */
   theme: theme.optional(),
+  /** The canvas's picture in lists: a screen id, or an image in the canvas folder (PNG, JPEG, WebP, SVG, 512 KB). */
+  cover: z.string().min(1).optional(),
   pages: z.array(z.unknown()).min(1, 'add at least one page'),
 })
 

@@ -49,7 +49,7 @@ function IconMenu({ project }: { project: ProjectInfo }) {
       await queryClient.invalidateQueries({ queryKey: keys.project })
       toast(
         file ? 'Icon set' : 'Icon removed',
-        file ? 'Saved as .design/system/icon; push takes it to the cloud.' : undefined,
+        file ? 'Saved as .design/icon; a linked project takes it to the cloud on its next push or pull.' : undefined,
       )
     } catch (error) {
       toast('Could not change the icon', (error as Error).message, 'error')
@@ -290,7 +290,10 @@ export function HomePage() {
         className="grid items-start gap-5 max-lg:grid-cols-1!"
         style={{ gridTemplateColumns: 'minmax(0,1fr) 340px' }}
       >
-        <CanvasList project={project} />
+        <div className="flex min-w-0 flex-col gap-5">
+          <CanvasList project={project} />
+          {slots.canvasesAfter}
+        </div>
         <SystemCard project={project} />
       </div>
       {slots.homeAfter}

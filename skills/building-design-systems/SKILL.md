@@ -15,7 +15,6 @@ A foss-design system lives in `.design/system/` and does two jobs at once: it is
   specimens/           one page per component, showing every variant and state
   guidelines/          Markdown pages: principles, voice, layout, patterns
   assets/              logos, icons, font files, imagery
-  icon.svg             the project's icon (`design icon`), also .png or .webp
 ```
 
 Full format: [System format](references/system-format.md).
@@ -30,7 +29,7 @@ command -v design >/dev/null && D=design || D="npx -y foss-design"
 
 ## Workflow
 
-1. **Set up.** No `.design` yet: `$D init`. No project icon yet (`$D icon` shows it) and the product has a logo or favicon: make a square SVG of the mark alone and set it with `$D icon <file.svg>` (kept as `.design/system/icon.svg`, at most 256 KB, counted in the project's cloud storage); with no mark to take it from, leave it. No system yet: `$D system init` scaffolds `system.json`, a starter `tokens.css`, one guideline and a `Button` component with its specimen. `--empty` scaffolds only `system.json` and `tokens.css`. The starter is a format example: replace its values with the real ones.
+1. **Set up.** No `.design` yet: `$D init`. No project icon yet (`$D icon` shows it) and the product has a logo or favicon: make a square SVG of the mark alone and set it with `$D icon <file.svg>` (kept as `.design/icon.svg`, at most 256 KB; a linked project's icon is the cloud project's, counted in its storage); with no mark to take it from, leave it. No system yet: `$D system init` scaffolds `system.json`, a starter `tokens.css`, one guideline and a `Button` component with its specimen. `--empty` scaffolds only `system.json` and `tokens.css`. The starter is a format example: replace its values with the real ones.
 2. **Extract from the codebase first.** When the project has a UI, the system mirrors it; do not invent a parallel one.
    - Tokens: Tailwind v4 `@theme` blocks and the CSS files that define them, `tailwind.config.*` theme sections, CSS custom properties, SCSS/Less variables, theme objects in TS/JS (MUI, Chakra, styled-components), design-token JSON.
    - Resolve every alias to its final value and copy values exactly: hex/oklch as written, `13.5px` stays `13.5px`, never rounded to a grid.

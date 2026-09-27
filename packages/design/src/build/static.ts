@@ -226,13 +226,15 @@ export async function buildSite(paths: DesignPaths, out: string, options: BuildO
   // Images on the canvases and system assets, under `_f/`.
   const files = new Set<string>()
   for (const canvas of canvases) {
+    const cover = canvas.doc.cover && 'url' in canvas.doc.cover ? canvas.doc.cover.url.split('?')[0]! : null
+    if (cover?.startsWith('_f/')) files.add(cover)
     for (const page of canvas.doc.pages)
       for (const section of page.sections)
         for (const item of section.items) if (item.kind === 'image' && item.url.startsWith('_f/')) files.add(item.url)
   }
   for (const asset of system?.doc.assets ?? []) files.add(asset.url)
-  // The project icon goes with every build: the viewer shows it whatever the unit.
-  const icon = project.iconUrl()
+  // The icon is the project's, not a unit's: a site shows it, a pushed unit leaves it to the cloud.
+  const icon = options.includeViewer === false ? null : project.iconUrl()
   if (icon) files.add(icon.split('?')[0]!)
   for (const url of files) {
     const rel = url.slice('_f/'.length).split('/').map(decodeURIComponent).join('/')

@@ -4,6 +4,8 @@ import { mapLimit } from '../capture/frames'
 import { CliError } from '../cli/log'
 import { type DesignPaths, isInside } from '../core/paths'
 import type { RemoteUnit } from './client'
+import { finishMerge, mergeUnit, openConflicts, readMergeState } from './merge'
+import { syncProjectMeta } from './meta'
 import { allUnitKeys, hashes, incomingDir, unitStatus, writeLink } from './state'
 import {
   byUnit,
@@ -19,44 +21,22 @@ import {
   unique,
   unitArg,
 } from './sync'
-import { caseClashes, isUnitPath, type Manifest, SYSTEM_UNIT, scanLocal, unitRelative, unitRoot } from './units'
+import { caseClashes, isUnitPath, type Manifest, SYSTEM_UNIT, scanLocal, unitRoot } from './units'
+import { pruneEmpty, writeInside } from './write'
 
 const HASH = /^[0-9a-f]{64}$/
+const MERGE_HINT =
+  'Resolve with `design merge` (it lists the files; `--here` or `--cloud` settles one or a unit), then `design push`.'
 
 type Plan =
   | { key: string; kind: 'apply'; remote: RemoteUnit | null; report: UnitReport }
-  | { key: string; kind: 'incoming'; remote: RemoteUnit; report: UnitReport }
+  | { key: string; kind: 'merge'; remote: RemoteUnit; report: UnitReport }
 
 /** Refuse a remote manifest that would write outside its unit. */
 function checkManifest(key: string, manifest: Manifest) {
   for (const [rel, entry] of Object.entries(manifest)) {
     if (!isUnitPath(key, rel)) throw new CliError(`The cloud sent a path that does not belong to ${key}: "${rel}"`)
     if (!HASH.test(entry.hash)) throw new CliError(`The cloud sent a bad hash for ${rel} in ${key}`)
-  }
-}
-
-/** Write a file under `root`, refusing to follow a folder link out of it. */
-function writeInside(root: string, rel: string, data: Buffer) {
-  const file = path.join(root, rel)
-  if (!isInside(root, file)) throw new CliError(`Refusing to write outside ${root}: ${rel}`)
-  fs.mkdirSync(path.dirname(file), { recursive: true })
-  if (!isInside(fs.realpathSync(root), fs.realpathSync(path.dirname(file))))
-    throw new CliError(`Refusing to write through a link out of ${root}: ${rel}`)
-  if (fs.existsSync(file) && fs.lstatSync(file).isSymbolicLink()) fs.unlinkSync(file)
-  fs.writeFileSync(file, data)
-}
-
-/** Remove folders left empty under `stop`, from `dir` up. */
-function pruneEmpty(dir: string, stop: string) {
-  let current = dir
-  while (isInside(stop, current) && current !== stop) {
-    try {
-      if (fs.readdirSync(current).length) return
-      fs.rmdirSync(current)
-    } catch {
-      return
-    }
-    current = path.dirname(current)
   }
 }
 
@@ -82,14 +62,16 @@ function applyUnit(paths: DesignPaths, key: string, local: Manifest, target: Man
 }
 
 /**
- * `design pull` (D6): apply the cloud head to every unit without local
- * changes; for units changed on both sides write the cloud version to
- * `.design/.cache/cloud/incoming/<unit>/` and record the conflict.
+ * `design pull` (D6): apply the cloud head to every unit without local changes; merge units
+ * changed on both sides three ways against their base (merge.ts). A clean merge leaves the unit at
+ * the cloud head with the local changes on top, ready to push; conflicts wait for `design merge`.
  */
 export async function pull(ctx: SyncContext, options: { units: string[]; theirs: string[] }): Promise<SyncReport> {
   const { paths, client } = ctx
   const link = structuredClone(ctx.link)
   const report = newReport('pull', link)
+  // The project's name and icon are no units: they sync first, whatever the units do.
+  for (const line of await syncProjectMeta(ctx.paths, ctx.client, link)) report.hints.push(line)
   const selected = unique(options.units.map(unitArg))
   const theirs = unique(options.theirs.map(unitArg))
 
@@ -140,9 +122,15 @@ export async function pull(ctx: SyncContext, options: { units: string[]; theirs:
       entry.message = 'local changes discarded'
       plans.push({ key, kind: 'apply', remote: unit, report: entry })
     } else if (!s.ahead) {
-      // A conflict recorded at a head this base already covers is stale.
+      const merging = readMergeState(paths, key)
+      const open = merging ? openConflicts(paths, merging) : []
+      if (open.length) {
+        report.units.push({ ...reportFor('conflict'), rev: s.baseRev, conflicts: open, message: MERGE_HINT })
+        continue
+      }
+      // A conflict recorded at a head this base already covers is settled.
       if (s.conflictRev !== undefined) {
-        delete link.conflicts[key]
+        finishMerge(paths, link, key, true)
         fs.rmSync(incomingDir(paths, key), { recursive: true, force: true })
       }
       report.units.push({ ...reportFor('up_to_date'), rev: s.baseRev })
@@ -169,16 +157,7 @@ export async function pull(ctx: SyncContext, options: { units: string[]; theirs:
         message: 'deleted in the cloud; your local changes are kept and `design push` creates it again',
       })
     } else {
-      const entry: UnitReport = {
-        ...reportFor('conflict'),
-        rev: undefined,
-        headRev: unit.headRev,
-        incoming: incomingDir(paths, key),
-      }
-      entry.message = `changed here and in the cloud; the cloud version (r${unit.headRev}) is in ${path.relative(paths.root, entry.incoming!)}`
-      // Already written by an earlier pull: nothing to fetch again.
-      if (s.conflictRev === unit.headRev && fs.existsSync(entry.incoming!)) report.units.push(entry)
-      else plans.push({ key, kind: 'incoming', remote: unit, report: entry })
+      plans.push({ key, kind: 'merge', remote: unit, report: { ...reportFor('merged'), headRev: unit.headRev } })
     }
   }
 
@@ -187,11 +166,22 @@ export async function pull(ctx: SyncContext, options: { units: string[]; theirs:
   for (const unit of scan.units.values())
     for (const [rel, entry] of Object.entries(unit.manifest)) byHash.set(entry.hash, path.join(paths.design, rel))
   const needed = new Set<string>()
+  // Bases of files changed on both sides: the cloud may have let some go (a deleted revision).
+  const bases = new Set<string>()
   for (const plan of plans) {
     if (!plan.remote) continue
     checkManifest(plan.key, plan.remote.manifest)
     for (const entry of Object.values(plan.remote.manifest)) needed.add(entry.hash)
+    if (plan.kind !== 'merge') continue
+    const base = link.units[plan.key]?.files ?? {}
+    const here = local(plan.key)
+    for (const [rel, hash] of Object.entries(base)) {
+      const h = here[rel]?.hash
+      const c = plan.remote.manifest[rel]?.hash
+      if (h && c && h !== hash && c !== hash && h !== c) bases.add(hash)
+    }
   }
+  for (const hash of bases) if (!needed.has(hash) && byHash.has(hash)) needed.add(hash)
   const blobs = new Map<string, Buffer>()
   const download: string[] = []
   for (const hash of needed) {
@@ -216,6 +206,16 @@ export async function pull(ctx: SyncContext, options: { units: string[]; theirs:
     })
     bar.done(`Downloaded ${plural(download.length, 'file')} (${megabytes(gotBytes)}) in ${seconds(started)}`)
   }
+  // Bases the cloud still has; one it let go leaves its file to merge without a base.
+  await mapLimit(
+    [...bases].filter((hash) => !blobs.has(hash)),
+    TRANSFERS,
+    async (hash) => {
+      try {
+        blobs.set(hash, await client.getBlob(link.project, hash))
+      } catch {}
+    },
+  )
 
   for (const plan of plans) {
     const { key, report: entry } = plan
@@ -226,12 +226,29 @@ export async function pull(ctx: SyncContext, options: { units: string[]; theirs:
       delete link.conflicts[key]
       fs.rmSync(incomingDir(paths, key), { recursive: true, force: true })
     } else {
-      const dir = incomingDir(paths, key)
-      fs.rmSync(dir, { recursive: true, force: true })
-      fs.mkdirSync(dir, { recursive: true })
-      for (const [rel, file] of Object.entries(plan.remote.manifest))
-        writeInside(dir, unitRelative(key, rel), blobs.get(file.hash)!)
-      link.conflicts[key] = plan.remote.headRev
+      const result = mergeUnit(
+        paths,
+        key,
+        plan.remote.headRev,
+        link.units[key]?.files ?? {},
+        local(key),
+        plan.remote.manifest,
+        (hash) => blobs.get(hash),
+      )
+      fs.rmSync(incomingDir(paths, key), { recursive: true, force: true })
+      // The base moves to the cloud head either way: what is here now is the local work on top of it.
+      link.units[key] = { rev: plan.remote.headRev, files: hashes(plan.remote.manifest) }
+      entry.rev = plan.remote.headRev
+      entry.files = result.files
+      if (result.conflicts.length) {
+        link.conflicts[key] = plan.remote.headRev
+        entry.action = 'conflict'
+        entry.conflicts = result.conflicts
+        entry.message = `${plural(result.conflicts.length, 'file')} changed on both sides did not merge. ${MERGE_HINT}`
+      } else {
+        delete link.conflicts[key]
+        entry.message = `merged with the cloud's changes (r${plan.remote.headRev})${result.files.merged ? `, ${plural(result.files.merged, 'file')} line by line` : ''}; \`design push\` takes your changes up`
+      }
     }
     report.units.push(entry)
   }
@@ -243,7 +260,7 @@ export async function pull(ctx: SyncContext, options: { units: string[]; theirs:
     report.ok = false
     report.error = {
       code: 'conflict',
-      message: `${plural(conflicts.length, 'unit')} changed both here and in the cloud. Merge the cloud version from incoming/ into your files, then \`design push --resolved <unit>\`; or \`design pull --theirs <unit>\` to take the cloud version.`,
+      message: `${plural(conflicts.length, 'unit')} changed both here and in the cloud and did not merge cleanly. ${MERGE_HINT}`,
     }
   }
   return report

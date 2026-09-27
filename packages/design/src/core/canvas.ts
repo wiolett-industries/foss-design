@@ -288,7 +288,47 @@ export function loadCanvas(
   })
 
   checkNavigation(doc, canvasCodeFiles(dir, screens), issues, fileRel, (file) => relToRoot(paths, file))
+  if (top.success && top.data.cover) doc.cover = resolveCover(top.data.cover, dir, screens, paths, urls, report)
   return { doc, screens }
+}
+
+/** The largest cover image; a cover is pushed with its canvas and counts toward storage. */
+export const MAX_COVER_BYTES = 512 * 1024
+const COVER_IMAGE = /\.(png|jpe?g|webp|svg)$/i
+
+/** canvas.json `cover`: one of the canvas's screens, or an image inside the canvas folder. */
+function resolveCover(
+  cover: string,
+  dir: string,
+  screens: ScreenSource[],
+  paths: DesignPaths,
+  urls: UrlScheme,
+  report: (severity: Issue['severity'], message: string, at?: string) => void,
+): CanvasDoc['cover'] {
+  if (screens.some((screen) => screen.id === cover)) return { screen: cover }
+  const file = path.resolve(dir, cover)
+  if (!isInside(dir, file) || !COVER_IMAGE.test(file)) {
+    report(
+      'error',
+      `cover "${cover}" is neither a screen id nor a PNG, JPEG, WebP or SVG in the canvas folder`,
+      'cover',
+    )
+    return undefined
+  }
+  if (!fs.existsSync(file)) {
+    report('error', `cover "${cover}" does not exist`, 'cover')
+    return undefined
+  }
+  const { size, mtimeMs } = fs.statSync(file)
+  if (size > MAX_COVER_BYTES) {
+    report(
+      'error',
+      `cover "${cover}" is ${Math.ceil(size / 1024)} KB; the limit is ${MAX_COVER_BYTES / 1024} KB`,
+      'cover',
+    )
+    return undefined
+  }
+  return { url: `${urls.file(relToDesign(paths, file))}?v=${Math.round(mtimeMs)}` }
 }
 
 /** `go` imported from the runtime: removed in 0.5 in favour of links to screen routes. */
@@ -377,7 +417,11 @@ function checkNavigation(
 export function summarize(canvas: ResolvedCanvas): CanvasSummary {
   const { doc } = canvas
   const screens = doc.pages.flatMap((page) => page.sections.flatMap((section) => section.items))
-  const firstScreen = screens.find((item) => item.kind === 'screen' && item.snapshots)
+  // canvas.json `cover` first; otherwise the first screen that has a snapshot.
+  const chosen = doc.cover && 'screen' in doc.cover ? doc.cover.screen : null
+  const firstScreen = chosen
+    ? screens.find((item) => item.kind === 'screen' && item.id === chosen)
+    : screens.find((item) => item.kind === 'screen' && item.snapshots)
   return {
     id: doc.id,
     title: doc.title,
@@ -387,8 +431,10 @@ export function summarize(canvas: ResolvedCanvas): CanvasSummary {
     updatedAt: doc.updatedAt,
     issues: doc.issues.filter((issue) => issue.severity === 'error').length,
     cover:
-      firstScreen && firstScreen.kind === 'screen'
-        ? (firstScreen.snapshots?.light ?? firstScreen.snapshots?.dark)
-        : undefined,
+      doc.cover && 'url' in doc.cover
+        ? doc.cover.url
+        : firstScreen && firstScreen.kind === 'screen'
+          ? (firstScreen.snapshots?.light ?? firstScreen.snapshots?.dark)
+          : undefined,
   }
 }

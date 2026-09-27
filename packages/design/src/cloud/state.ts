@@ -18,6 +18,10 @@ export interface CloudLink {
   units: Record<string, UnitBase>
   /** Units pulled with changes on both sides, and the head that was written to `incoming/`. */
   conflicts: Record<string, number>
+  /** The cloud project's name at the last sync: the project's name here. */
+  name?: string
+  /** sha256 of the project icon at the last sync (null: none), the base both sides are compared to. */
+  icon?: string | null
 }
 
 export type UnitState = 'in_sync' | 'local_changes' | 'remote_ahead' | 'conflict' | 'archived'
@@ -69,7 +73,14 @@ export function readLink(paths: DesignPaths): CloudLink | null {
   }
   const conflicts: Record<string, number> = {}
   for (const [key, rev] of Object.entries(data.conflicts ?? {})) if (typeof rev === 'number') conflicts[key] = rev
-  return { host: data.host, project: data.project, units, conflicts }
+  return {
+    host: data.host,
+    project: data.project,
+    units,
+    conflicts,
+    ...(typeof data.name === 'string' ? { name: data.name } : {}),
+    ...(typeof data.icon === 'string' || data.icon === null ? { icon: data.icon } : {}),
+  }
 }
 
 export function requireLink(paths: DesignPaths): CloudLink {
@@ -86,6 +97,8 @@ export function writeLink(paths: DesignPaths, link: CloudLink) {
   const data: CloudLink = {
     host: link.host,
     project: link.project,
+    ...(link.name !== undefined ? { name: link.name } : {}),
+    ...(link.icon !== undefined ? { icon: link.icon } : {}),
     units: sorted(link.units),
     conflicts: sorted(link.conflicts),
   }

@@ -77,14 +77,15 @@ export function Segmented<T extends string>({
               on ? 'text-ink' : 'text-muted hover:text-ink2',
             )}
           >
+            {/* Stacked by z-index, not DOM order: sliding right, the pill passes under the labels it crosses. */}
             {on ? (
               <motion.span
                 layoutId={indicator}
-                className="absolute inset-0 rounded-[4px] bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.10)]"
+                className="absolute inset-0 z-0 rounded-[4px] bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.10)]"
                 transition={{ type: 'spring', stiffness: 520, damping: 42 }}
               />
             ) : null}
-            <span className="relative flex items-center gap-1.5">{item.label}</span>
+            <span className="relative z-[1] flex items-center gap-1.5">{item.label}</span>
           </button>
         )
       })}

@@ -7,6 +7,8 @@ import { relToRoot } from '../core/paths'
 import { DesignProject } from '../core/project'
 import { STATIC_URLS } from '../core/sources'
 import { CloudError, type PushUnit, type RemoteUnit } from './client'
+import { finishMerge, readMergeState } from './merge'
+import { syncProjectMeta } from './meta'
 import { hashes, incomingDir, type UnitStatus, unitStatus, writeLink } from './state'
 import {
   byUnit,
@@ -49,10 +51,20 @@ function blockedReport(status: UnitStatus, message: string): UnitReport {
  * unit's base, build the changed units, upload the blobs the cloud lacks and
  * commit every unit in one `POST /push`.
  */
-export async function push(ctx: SyncContext, options: { units: string[]; resolved: string[] }): Promise<SyncReport> {
+export async function push(
+  ctx: SyncContext,
+  options: {
+    units: string[]
+    resolved: string[]
+    /** Before the canvases build (their cover snapshots); returns lines for the report. */
+    beforeBuild?: (canvasIds: string[]) => Promise<string[]>
+  },
+): Promise<SyncReport> {
   const { paths, client, log } = ctx
   const link = structuredClone(ctx.link)
   const report = newReport('push', link)
+  // The project's name and icon are no units: they sync first, whatever the units do.
+  for (const line of await syncProjectMeta(ctx.paths, ctx.client, link)) report.hints.push(line)
   const selected = unique(options.units.map(unitArg))
   const resolved = unique(options.resolved.map(unitArg))
 
@@ -66,11 +78,21 @@ export async function push(ctx: SyncContext, options: { units: string[]; resolve
     )
   }
 
+  // A merge whose conflicts were all edited away is done: its files are the result.
+  for (const key of Object.keys(link.conflicts)) if (readMergeState(paths, key)) finishMerge(paths, link, key)
   // --resolved: the merge is done, so the base moves to the head pull recorded. Saved only once the push lands.
   for (const key of resolved) {
     const head = link.conflicts[key]
-    if (head === undefined)
+    if (head === undefined) {
+      if (link.units[key]) continue
       throw new CliError(`${key} has no pending conflict; --resolved is for units \`design pull\` reported in conflict`)
+    }
+    if (readMergeState(paths, key)) {
+      const open = finishMerge(paths, link, key, true)
+      if (open.length)
+        throw new CliError(`${key} still has conflict markers in ${open.map((item) => item.path).join(', ')}`)
+      continue
+    }
     link.units[key] = { rev: head, files: link.units[key]?.files ?? {} }
     delete link.conflicts[key]
   }
@@ -162,7 +184,12 @@ export async function push(ctx: SyncContext, options: { units: string[]; resolve
     if (s.conflictRev !== undefined) {
       const dir = path.relative(paths.root, incomingDir(paths, key))
       blocked.push(
-        blockedReport(s, `pull left the cloud version in ${dir}; merge it, then \`design push --resolved ${key}\``),
+        blockedReport(
+          s,
+          readMergeState(paths, key)
+            ? 'a merge with the cloud has conflicts left: `design merge` lists them and settles them'
+            : `pull left the cloud version in ${dir}; merge it, then \`design push --resolved ${key}\``,
+        ),
       )
     } else if (s.ahead) {
       blocked.push(
@@ -206,6 +233,8 @@ export async function push(ctx: SyncContext, options: { units: string[]; resolve
     return false
   })
   if (!pushing.length) return report
+  const canvasIds = pushing.map(unitCanvasId).filter((id): id is string => id !== null)
+  if (options.beforeBuild) for (const line of await options.beforeBuild(canvasIds)) report.hints.push(line)
 
   const project = new DesignProject(paths, STATIC_URLS)
   const systemRev = remote.get(SYSTEM_UNIT)?.headRev ?? 0
