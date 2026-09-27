@@ -3,6 +3,12 @@ name: CI
 on:
   push:
     branches: [main]
+    # A release commit only bumps these three; the commit before it was checked, and the Release
+    # workflow checks the tag again before publishing. Any other file in a push still runs CI.
+    paths-ignore:
+      - packages/design/package.json
+      - .claude-plugin/plugin.json
+      - .codex-plugin/plugin.json
   pull_request:
 
 permissions:
