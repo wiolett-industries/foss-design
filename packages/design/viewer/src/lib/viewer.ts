@@ -16,8 +16,12 @@ export interface ViewerSlots {
   belowBar?: ReactNode
   /** Next to the project title on the home page. */
   homeActions?: ReactNode
+  /** Under the project title on the home page, in place of the path and version. */
+  homeSub?: ReactNode
   /** At the end of each canvas row on the home page. */
   canvasRowActions?: (canvasId: string) => ReactNode
+  /** A strip under the canvas list on the home page: how canvases get there. */
+  canvasesFoot?: ReactNode
   /** Below the panels of the home page. */
   homeAfter?: ReactNode
 }

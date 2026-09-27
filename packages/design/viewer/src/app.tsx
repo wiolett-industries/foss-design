@@ -16,6 +16,7 @@ import {
   viewerKeys,
 } from './lib/viewer'
 import { CanvasPage } from './pages/canvas/canvas-page'
+import { FullPage } from './pages/canvas/full-page'
 import { PlayPage } from './pages/canvas/play-page'
 import { HomePage } from './pages/home'
 import { NotFound } from './pages/not-found'
@@ -34,6 +35,9 @@ function Title() {
 function Routes() {
   return (
     <Switch>
+      <Route path="/c/:canvas/full/:item">
+        {(params) => <FullPage canvasId={params.canvas} itemId={params.item} />}
+      </Route>
       <Route path="/c/:canvas/play/:item">
         {(params) => <PlayPage canvasId={params.canvas} itemId={params.item} />}
       </Route>
@@ -63,6 +67,9 @@ function ScopedRoutes({ canvas }: { canvas: string }) {
   const guard = (param: string, page: ReactNode) => (sameId(param, canvas) ? page : <Redirect to={home} replace />)
   return (
     <Switch>
+      <Route path="/c/:canvas/full/:item">
+        {(params) => guard(params.canvas, <FullPage canvasId={canvas} itemId={params.item} />)}
+      </Route>
       <Route path="/c/:canvas/play/:item">
         {(params) => guard(params.canvas, <PlayPage canvasId={canvas} itemId={params.item} />)}
       </Route>

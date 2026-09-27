@@ -6,7 +6,7 @@ import { SlidePanel } from '../../components/slide-panel'
 import { ThemeMenu } from '../../components/theme-menu'
 import { Bar } from '../../components/topbar'
 import { useCanvas } from '../../lib/api'
-import { absoluteUrl, frameSrc, listenToFrame, reloadFrame, sendTheme } from '../../lib/frames'
+import { frameSrc, listenToFrame, reloadFrame, sendTheme } from '../../lib/frames'
 import { useTheme } from '../../lib/theme'
 import { useViewer } from '../../lib/viewer'
 import { IconButton } from '../../ui/button'
@@ -16,6 +16,7 @@ import { Kbd } from '../../ui/text'
 import { Tooltip } from '../../ui/tooltip'
 import { NotFound } from '../not-found'
 import { InspectToggle } from './canvas-bar'
+import { useOpenUrl } from './full-page'
 import { isTyping } from './viewport'
 
 type Frame = ScreenItem | UrlItem
@@ -112,6 +113,7 @@ function Player({ canvas, itemId }: { canvas: CanvasDoc; itemId: string }) {
   const entry = list[index]
   const item = entry?.item
   const frameTheme = item?.kind === 'screen' ? (item.theme ?? theme) : theme
+  const openUrl = useOpenUrl(canvas.id, item, frameTheme)
   const [openTheme] = useState(frameTheme)
   const src = item ? (item.kind === 'screen' ? frameSrc(item.url, openTheme) : item.url) : ''
   const frames = useMemo(() => (frameEl && item?.kind === 'screen' ? [frameEl] : []), [frameEl, item?.kind])
@@ -153,8 +155,6 @@ function Player({ canvas, itemId }: { canvas: CanvasDoc; itemId: string }) {
   const height = item.frame.height === 'auto' ? Math.max(area.h - 48, 400) : item.frame.height
   const scale = fit === 'fit' ? Math.min(1, (area.w - 48) / width, (area.h - 48) / height) : 1
   const fits = width <= area.w - 48 && height <= area.h - 48
-  // Sandboxed screens are served to frames only; a tab of their own would not load.
-  const openUrl = item.kind === 'url' ? item.url : frameSandbox ? null : absoluteUrl(frameSrc(item.url, frameTheme))
 
   return (
     <div className="flex h-dvh flex-col">

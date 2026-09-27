@@ -18,6 +18,7 @@ export function Dialog({
   children,
   actions,
   footNote,
+  below,
   width = 440,
 }: {
   open: boolean
@@ -30,6 +31,8 @@ export function Dialog({
   actions?: ReactNode
   /** Muted text at the start of the foot. */
   footNote?: ReactNode
+  /** Full-width content under the body, scrolling on its own: lists with row borders. */
+  below?: ReactNode
   width?: number
 }) {
   return (
@@ -48,6 +51,15 @@ export function Dialog({
                 <DialogPrimitive.Content
                   asChild
                   forceMount
+                  // The first field takes focus; without one the dialog itself does, not its close button.
+                  onOpenAutoFocus={(event) => {
+                    event.preventDefault()
+                    const content = event.currentTarget as HTMLElement
+                    const field = content.querySelector<HTMLElement>(
+                      'input:not([type="hidden"]), textarea, [data-autofocus]',
+                    )
+                    ;(field ?? content).focus({ preventScroll: true })
+                  }}
                   // Without a description, say so instead of pointing at none.
                   {...(description ? {} : { 'aria-describedby': undefined })}
                 >
@@ -56,7 +68,8 @@ export function Dialog({
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.1 } }}
                     transition={{ type: 'spring', stiffness: 560, damping: 40 }}
-                    className={cn(floatingSurface, 'flex max-w-full flex-col')}
+                    tabIndex={-1}
+                    className={cn(floatingSurface, 'flex max-w-full flex-col outline-none')}
                     style={{ width }}
                   >
                     <PanelHead
@@ -80,6 +93,11 @@ export function Dialog({
                         ) : null}
                         {children}
                       </PanelBody>
+                    ) : null}
+                    {below ? (
+                      <div className="max-h-[min(56vh,520px)] min-h-0 overflow-y-auto border-t border-rule">
+                        {below}
+                      </div>
                     ) : null}
                     {actions || footNote ? <PanelFoot left={footNote} right={actions} /> : null}
                   </motion.div>

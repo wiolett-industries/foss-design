@@ -61,6 +61,7 @@ export function MenuItem({
   active,
   disabled,
   hint,
+  className,
 }: {
   children: ReactNode
   onSelect?: () => void
@@ -68,9 +69,10 @@ export function MenuItem({
   active?: boolean
   disabled?: boolean
   hint?: ReactNode
+  className?: string
 }) {
   return (
-    <DropdownMenu.Item disabled={disabled} onSelect={onSelect} className={menuItemClass(danger, active)}>
+    <DropdownMenu.Item disabled={disabled} onSelect={onSelect} className={cn(menuItemClass(danger, active), className)}>
       {children}
       {hint ? <span className="ml-auto pl-3 text-[12px] text-muted">{hint}</span> : null}
     </DropdownMenu.Item>

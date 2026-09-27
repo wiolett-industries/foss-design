@@ -5,7 +5,7 @@ import { ThemeMenu } from '../../components/theme-menu'
 import { Bar } from '../../components/topbar'
 import { Mark } from '../../components/wordmark'
 import { copyText } from '../../lib/copy'
-import { absoluteUrl, frameSrc, reloadFrame } from '../../lib/frames'
+import { reloadFrame } from '../../lib/frames'
 import { useStore } from '../../lib/store'
 import { useViewer } from '../../lib/viewer'
 import { Button, IconButton } from '../../ui/button'
@@ -14,6 +14,7 @@ import { Icon } from '../../ui/icon'
 import { Menu, MenuItem, MenuLabel } from '../../ui/menu'
 import { Kbd } from '../../ui/text'
 import { Tooltip } from '../../ui/tooltip'
+import { useOpenUrl } from './full-page'
 import { pageHref } from './sidebar'
 import type { ViewStore } from './view-state'
 
@@ -134,17 +135,10 @@ export function SelectionBar({
   const selected = useStore(store, (state) => state.selected)
   const active = useStore(store, (state) => state.active)
   const status = useStore(store, (state) => (selected ? state.frames[selected] : undefined))
-  const { frameSandbox } = useViewer()
   const item = layoutItems.find((i) => i.id === selected)
+  const openUrl = useOpenUrl(canvas.id, item?.kind === 'screen' || item?.kind === 'url' ? item : undefined, theme)
   if (!item) return null
   const frame = item.kind === 'screen' || item.kind === 'url'
-  // Sandboxed screens are served to frames only; a tab of their own would not load.
-  const openUrl =
-    item.kind === 'screen' && !frameSandbox
-      ? absoluteUrl(frameSrc(item.url, item.theme ?? theme))
-      : item.kind === 'url'
-        ? item.url
-        : null
   const reload = () =>
     reloadFrame(document.querySelector<HTMLIFrameElement>(`[data-item="${CSS.escape(item.id)}"] iframe`))
   const errors = status?.errors ?? []

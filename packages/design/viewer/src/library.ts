@@ -68,6 +68,7 @@ export {
   Strip,
   THead,
 } from './ui/panel'
+export { Skeleton, SkeletonRows } from './ui/skeleton'
 export { Kbd, Mono, Muted, Two } from './ui/text'
 export { TextArea, type TextAreaProps, TextField, type TextFieldProps } from './ui/text-field'
 export { Toaster, type ToastTone, toast } from './ui/toast'

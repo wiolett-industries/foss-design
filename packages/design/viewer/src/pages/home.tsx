@@ -9,6 +9,7 @@ import { ButtonLink } from '../ui/button'
 import { Icon } from '../ui/icon'
 import { Content, Notice, PageHead } from '../ui/page'
 import { KV, Panel, PanelBody, PanelHead, RowLink } from '../ui/panel'
+import { Skeleton, SkeletonRows } from '../ui/skeleton'
 import { Mono, Two } from '../ui/text'
 
 function Cover({ canvas }: { canvas: CanvasSummary }) {
@@ -37,8 +38,18 @@ function WithActions({ actions, children }: { actions: ReactNode; children: Reac
   )
 }
 
+/** The embedding app's strip under the canvas list. */
+function Foot({ children }: { children: ReactNode }) {
+  if (!children) return null
+  return (
+    <div className="flex items-center gap-2.5 border-t border-rule bg-soft px-4 py-3 text-[12.5px] text-muted">
+      {children}
+    </div>
+  )
+}
+
 function CanvasList({ project }: { project: ProjectInfo }) {
-  const rowActions = useViewer().slots.canvasRowActions
+  const { canvasRowActions: rowActions, canvasesFoot } = useViewer().slots
   if (!project.canvases.length) {
     return (
       <Panel>
@@ -51,6 +62,7 @@ function CanvasList({ project }: { project: ProjectInfo }) {
             </span>
           </div>
         </PanelBody>
+        <Foot>{canvasesFoot}</Foot>
       </Panel>
     )
   }
@@ -82,6 +94,7 @@ function CanvasList({ project }: { project: ProjectInfo }) {
           </WithActions>
         )
       })}
+      <Foot>{canvasesFoot}</Foot>
     </Panel>
   )
 }
@@ -107,17 +120,17 @@ function SystemCard({ project }: { project: ProjectInfo }) {
         <span className="text-[15px] font-semibold">{system.name}</span>
         {system.description ? <span className="text-[13px] text-ink2">{system.description}</span> : null}
       </PanelBody>
-      <KV label="Tokens" labelWidth={120}>
+      <KV label="Tokens" labelWidth={120} end>
         <Count value={system.tokens} />
       </KV>
-      <KV label="Components" labelWidth={120}>
+      <KV label="Components" labelWidth={120} end>
         <Count value={system.components} />
       </KV>
-      <KV label="Guidelines" labelWidth={120}>
+      <KV label="Guidelines" labelWidth={120} end>
         <Count value={system.guidelines} />
       </KV>
       {system.issues ? (
-        <KV label="Problems" labelWidth={120}>
+        <KV label="Problems" labelWidth={120} end>
           <Badge tone="danger">{system.issues}</Badge>
         </KV>
       ) : null}
@@ -125,18 +138,45 @@ function SystemCard({ project }: { project: ProjectInfo }) {
   )
 }
 
+/** The home page's shape while the project loads, so it fills in instead of popping in. */
+function HomeSkeleton() {
+  return (
+    <Content>
+      <div className="flex flex-col gap-2.5 pt-1 pb-1">
+        <Skeleton className="h-6 w-[220px]" />
+        <Skeleton className="h-3.5 w-[300px]" />
+      </div>
+      <div
+        className="grid items-start gap-5 max-lg:grid-cols-1!"
+        style={{ gridTemplateColumns: 'minmax(0,1fr) 340px' }}
+      >
+        <Panel>
+          <PanelHead title="Canvases" />
+          <SkeletonRows rows={3} lead={86} minH={74} />
+        </Panel>
+        <Panel>
+          <PanelHead title="Design system" />
+          <SkeletonRows rows={3} lead={0} minH={40} />
+        </Panel>
+      </div>
+    </Content>
+  )
+}
+
 export function HomePage() {
   const { data: project, error, isLoading } = useProject()
   const { slots } = useViewer()
   if (error) return <Notice title="Could not load the project" text={(error as Error).message} />
-  if (isLoading || !project) return null
+  if (isLoading || !project) return <HomeSkeleton />
   return (
     <Content>
       <PageHead
         title={project.name}
         right={slots.homeActions}
         sub={
-          project.static ? (
+          slots.homeSub ? (
+            slots.homeSub
+          ) : project.static ? (
             `Snapshot built with foss-design ${project.version}`
           ) : (
             <>
