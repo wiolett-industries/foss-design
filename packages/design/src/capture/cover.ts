@@ -1,66 +1,117 @@
 import fs from 'node:fs'
+import type { Progress } from '../cli/log'
 import { DesignProject } from '../core/project'
 import { DEV_URLS } from '../core/sources'
 import { SnapshotStore } from '../server/snapshots'
+import type { Theme } from '../shared/types'
 import { findChrome, launchChrome, openFrame } from './chrome'
-import { canvasFrames } from './frames'
+import { canvasFrames, mapLimit } from './frames'
 
 /** Snapshots are this wide at most, as the viewer takes them. */
 const SNAPSHOT_WIDTH = 900
+/** Pages Chrome renders at once. */
+const TABS = 4
+const THEMES: Theme[] = ['light', 'dark']
+
+export interface SnapshotTarget {
+  canvas: string
+  screen: string
+  theme: Theme
+}
 
 /**
- * The screen that pictures each canvas (canvas.json `cover`, else the first screen) gets a fresh
- * snapshot when it has none or its file changed since: a pushed canvas then shows a current
- * picture even when nobody opened it in the viewer. Needs Chrome and the preview server (`base`
- * starts it); without Chrome nothing happens. Returns lines worth telling the user.
+ * The snapshots `canvasIds` lack: every screen in both themes (one, when the screen pins its
+ * theme), missing or older than the screen's file. The viewer shows them for frames that are not
+ * running, and a pushed canvas carries them, so the cloud shows the right theme from far away too.
  */
-export async function refreshCovers(
+export function staleSnapshots(
   paths: DesignProject['paths'],
   canvasIds: readonly string[],
-  base: () => Promise<string>,
-): Promise<string[]> {
+  filter: { page?: string; screens?: ReadonlySet<string> } = {},
+): SnapshotTarget[] {
   const store = new SnapshotStore(paths.snapshots)
   const project = new DesignProject(paths, DEV_URLS, store.lookup)
-  const stale: { canvas: string; screen: string }[] = []
+  const stale: SnapshotTarget[] = []
   for (const id of canvasIds) {
     const canvas = project.canvas(id)
-    if (!canvas || (canvas.doc.cover && 'url' in canvas.doc.cover)) continue
-    const screen = canvas.doc.cover?.screen ?? canvas.screens[0]?.id
-    const source = canvas.screens.find((item) => item.id === screen)
-    if (!screen || !source || !fs.existsSync(source.file)) continue
-    const taken = store.version(id, screen, 'light')
-    if (!taken || taken < fs.statSync(source.file).mtimeMs) stale.push({ canvas: id, screen })
-  }
-  if (!stale.length) return []
-  if (!findChrome()) return ['No Chrome here, so canvas covers keep their last snapshot.']
-
-  const url = await base()
-  const browser = await launchChrome()
-  const lines: string[] = []
-  try {
-    for (const { canvas, screen } of stale) {
-      const doc = project.canvas(canvas)!.doc
-      const job = canvasFrames(doc, url, 'light', { id: screen })[0]
-      if (!job) continue
-      const page = await browser.newPage({
-        viewport: { width: job.width, height: job.height },
-        deviceScaleFactor: Math.min(1, SNAPSHOT_WIDTH / job.width),
-      })
-      try {
-        const report = await openFrame(page, job.url, { waitForReady: job.waitForReady })
-        if (!report.ready) {
-          lines.push(`${canvas}: ${screen} did not finish rendering, so its cover keeps the last snapshot`)
-          continue
-        }
-        const png = await page.screenshot({ fullPage: job.fullPage })
-        const height = job.fullPage ? await page.evaluate(() => document.documentElement.scrollHeight) : undefined
-        store.save(canvas, screen, 'light', png, height)
-      } finally {
-        await page.close().catch(() => {})
+    if (!canvas) continue
+    // A screen that pins its theme renders in it whatever the canvas asks for.
+    const inLight = canvasFrames(canvas.doc, '', 'light', { page: filter.page, includeUrls: false })
+    const inDark = new Map(
+      canvasFrames(canvas.doc, '', 'dark', { page: filter.page, includeUrls: false }).map((job) => [job.id, job.theme]),
+    )
+    const files = new Map(canvas.screens.map((screen) => [screen.id, screen.file]))
+    for (const job of inLight) {
+      if (filter.screens && !filter.screens.has(job.id)) continue
+      const file = files.get(job.id)
+      if (!file || !fs.existsSync(file)) continue
+      const changed = fs.statSync(file).mtimeMs
+      const pinned = inDark.get(job.id) === job.theme
+      const themes = pinned ? [job.theme] : THEMES
+      const screen = { id: job.id }
+      for (const theme of themes) {
+        const taken = store.version(id, screen.id, theme)
+        if (!taken || taken < changed) stale.push({ canvas: id, screen: screen.id, theme })
       }
     }
+  }
+  return stale
+}
+
+/**
+ * Take `targets` in Chrome through the preview server (`base` starts it), a few at a time, with
+ * `progress` counting them. Returns lines worth telling the user; without Chrome nothing happens.
+ */
+export async function takeSnapshots(
+  paths: DesignProject['paths'],
+  targets: readonly SnapshotTarget[],
+  base: () => Promise<string>,
+  progress: Progress,
+): Promise<string[]> {
+  if (!targets.length) return []
+  if (!findChrome()) return ['No Chrome here, so screens keep the snapshots they have.']
+  const store = new SnapshotStore(paths.snapshots)
+  const project = new DesignProject(paths, DEV_URLS, store.lookup)
+  const url = await base()
+  const browser = await launchChrome()
+  const failed: string[] = []
+  const started = Date.now()
+  let done = 0
+  const line = () => `Snapshots ${done}/${targets.length} (both themes, as the viewer and the cloud show them)`
+  progress.update(line())
+  try {
+    await mapLimit([...targets], TABS, async ({ canvas, screen, theme }) => {
+      const job = canvasFrames(project.canvas(canvas)!.doc, url, theme, { id: screen })[0]
+      if (job) {
+        const page = await browser.newPage({
+          viewport: { width: job.width, height: job.height },
+          deviceScaleFactor: Math.min(1, SNAPSHOT_WIDTH / job.width),
+          colorScheme: theme,
+        })
+        try {
+          const report = await openFrame(page, job.url, { waitForReady: job.waitForReady })
+          if (report.ready) {
+            const png = await page.screenshot({ fullPage: job.fullPage })
+            const height = job.fullPage ? await page.evaluate(() => document.documentElement.scrollHeight) : undefined
+            store.save(canvas, screen, theme, png, height)
+          } else failed.push(`${canvas}/${screen} (${theme})`)
+        } catch {
+          failed.push(`${canvas}/${screen} (${theme})`)
+        } finally {
+          await page.close().catch(() => {})
+        }
+      }
+      done++
+      progress.update(line())
+    })
   } finally {
     await browser.close()
   }
-  return lines
+  const seconds = Math.round((Date.now() - started) / 1000)
+  progress.done(`Took ${targets.length - failed.length} snapshot${targets.length === 1 ? '' : 's'} in ${seconds}s`)
+  if (!failed.length) return []
+  const shown = failed.slice(0, 5).join(', ')
+  return [
+    `${failed.length} screen${failed.length === 1 ? '' : 's'} did not finish rendering, so they keep their last snapshot: ${shown}${failed.length > 5 ? ', …' : ''}. \`design check --render\` says why.`,
+  ]
 }

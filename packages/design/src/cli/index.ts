@@ -14,6 +14,7 @@ import { runPreview, runPreviews, runStop, runStopAll } from './commands/preview
 import { runRename } from './commands/rename'
 import { runInit, runNew, runSystemInit } from './commands/scaffold'
 import { runShot } from './commands/shot'
+import { runSnapshots } from './commands/snapshots'
 import { runStatus } from './commands/status'
 import { runPull, runPush } from './commands/sync'
 import { bold, CliError, dim, endLine, print, red } from './log'
@@ -55,6 +56,9 @@ ${bold('Verify')}
                                              the production build design push uploads instead of the
                                              dev server. Narrow it to canvases, one page (--page) or
                                              single screens
+  snapshots [<canvas>[/<screen>]…]           Take the snapshots screens lack, in both themes, for the
+            [--page <id>]                    viewer to show while frames do not run (push does this
+                                             for the canvases it pushes)
   shot <canvas>[/<screen>] [--page <id>]     Screenshot screens with Chrome (PNG paths are printed);
        [--theme light|dark] [--out <dir>]    @system or @system/<id> shoots the design system specimens
        [--overview]
@@ -73,7 +77,7 @@ ${bold('Cloud')}  ${dim('units: system (design.json + system/) and canvas/<id>; 
   push [canvas…] [--json]                    Build and upload what changed here (or the named units); a
        [--resolved <unit>]                   system change pushes every active canvas with it. When the
                                              cloud is ahead it pulls and merges first, then pushes; it
-                                             stops on conflicts. Refreshes each canvas's cover snapshot.
+                                             stops on conflicts. Takes missing snapshots (both themes).
                                              Prints the web link of every pushed canvas; refuses screens
                                              that still call go()
   pull [canvas…] [--json]                    Take cloud changes into .design; a unit changed on both sides
@@ -211,6 +215,8 @@ async function main(argv: string[]) {
         page: values.page,
         built: !!values.built,
       })
+    case 'snapshots':
+      return runSnapshots(projectPaths(values.root), rest, { page: values.page })
     case 'shot': {
       if (!rest[0]) throw new CliError('Usage: design shot <canvas>[/<screen>] [--page <id>] [--theme light|dark]')
       return runShot(projectPaths(values.root), rest[0], {

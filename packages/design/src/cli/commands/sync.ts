@@ -1,4 +1,4 @@
-import { refreshCovers } from '../../capture/cover'
+import { staleSnapshots, takeSnapshots } from '../../capture/cover'
 import { CloudError } from '../../cloud/client'
 import { pull } from '../../cloud/pull'
 import { push } from '../../cloud/push'
@@ -97,10 +97,16 @@ async function runSync(
 }
 
 export function runPush(paths: DesignPaths, units: string[], options: { resolved: string[]; json: boolean }) {
-  // Each pushed canvas's cover gets a current snapshot, through the preview server and Chrome.
-  const beforeBuild = (canvasIds: string[]) =>
-    refreshCovers(paths, canvasIds, async () => `http://127.0.0.1:${(await ensureServer(paths, {})).port}`)
   return runSync(paths, 'push', options.json, async (ctx) => {
+    // Pushed canvases take the snapshots they lack, in both themes, so the cloud shows each screen
+    // in the theme it is looked at before its frame runs (the preview server and Chrome take them).
+    const beforeBuild = (canvasIds: string[]) =>
+      takeSnapshots(
+        paths,
+        staleSnapshots(paths, canvasIds),
+        async () => `http://127.0.0.1:${(await ensureServer(paths, {})).port}`,
+        ctx.progress(),
+      )
     const first = await push(ctx, { units, resolved: options.resolved, beforeBuild })
     if (first.ok || first.error?.code !== 'pull_first') return first
     // Someone pushed first: take their changes in (a three-way merge), then push again.
