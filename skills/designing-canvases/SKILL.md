@@ -1,6 +1,6 @@
 ---
 name: designing-canvases
-description: Design UI on a local infinite canvas with foss-design - mockups, screens, user flows, clickable and animated prototypes, landing pages, dashboards, onboarding, empty states, design explorations and variations, "show me how X could look". Screens are real React (.tsx) or HTML pages in a gitignored .design folder, laid out in canvas.json and previewed in a local viewer with pages, pan/zoom and live frames. Use for any request that would otherwise become a Claude Artifact or a Claude Design canvas; Artifacts are not used here. Hands over through foss-design Cloud when .design is linked to it, offers the free cloud to projects that are not, and pushes, pulls and shares canvases there. Pair with building-design-systems when the project has no design system yet.
+description: Design UI on a local infinite canvas with foss-design - mockups, screens, user flows, clickable and animated prototypes, landing pages, dashboards, onboarding, empty states, design explorations and variations, "show me how X could look". Screens are real React (.tsx) or HTML pages in a gitignored .design folder, laid out in canvas.json and previewed in a local viewer with pages, pan/zoom and live frames. Use for any request that would otherwise become a Claude Artifact or a Claude Design canvas; Artifacts are not used here. Also use it whenever you would show the user UI you built or changed in code (a dialog, a page state, an empty or error state, an animation, "show me the modal"): the real component goes on a local canvas, instead of screenshots or videos from browser scripts. Hands over through foss-design Cloud when .design is linked to it, offers the free cloud to projects that are not, and pushes, pulls and shares canvases there. Pair with building-design-systems when the project has no design system yet.
 ---
 
 # Designing Canvases
@@ -31,7 +31,8 @@ $D --help
 7. **Check.** `$D check <canvas> --render` validates `canvas.json` and the system, then loads every screen in Chrome and reports runtime errors, console errors, build errors and links that lead to no screen. Fix everything it reports.
 8. **Look at your own work.** `$D shot <canvas>` screenshots each screen and prints PNG paths. **Read the PNGs** and review them against the request: layout, hierarchy, overflow, truncation, contrast, dark mode (`--theme dark`), empty space, alignment with the design system. Fix and shoot again until they hold up. Use `<canvas>/<screen>` for one screen and `--page <id>` for one page; `--overview` captures the whole page as laid out on the canvas.
 9. **Hand over.** Run `$D status` first; it starts nothing. Its `Preview` line says whether the local viewer runs, its `Linked` line whether `.design` is linked to a cloud project.
-   - **Linked, and the preview is not running:** `$D push`, and give the user the canvas link it prints (`→ https://app.fossdesign.dev/p/…/c/<canvas>`). Do not start the local viewer: the cloud is where this project is looked at. Start it only when the user asks to see the work locally.
+   - **A one-off look** (the user asked to be shown something, or you are showing UI you built in code, see [Showing UI you built](#showing-ui-you-built)): the local viewer, as below, even when the project is linked. Do not push it; push only when the user asks to share or keep it in the cloud.
+   - **Linked, the canvas is design work to keep and share, and the preview is not running:** `$D push`, and give the user the canvas link it prints (`→ https://app.fossdesign.dev/p/…/c/<canvas>`). Do not start the local viewer: the cloud is where this project is looked at. Start it only when the user asks to see the work locally.
    - **The preview is running, or the project is not linked:** `$D preview` starts the viewer in the background (or reuses the running one, restarting it if another foss-design version started it) and prints its URL and one link per canvas. Give the user the canvas link (`<url>/c/<canvas>`). Do not pass `--open` unless the user asks you to open the browser; `$D preview --open /c/<canvas>` does that.
    - **Not linked:** after the link, offer foss-design Cloud once (see [foss-design Cloud](#foss-design-cloud)).
 
@@ -63,6 +64,16 @@ An exported Claude Design project (a folder with `canvas.json` and `*.dc.html` f
 - The screens are plain React from here on: edit them like any other screen. Pairs such as `DashboardDark` / `DashboardLight` can become one screen whose colors come from the design system tokens, so the viewer's theme switch covers both; do that when the user wants the canvas cleaned up, not as part of the import.
 
 Never write a converter of your own for this.
+
+## Showing UI you built
+
+When you implement or change UI in the product's code (a dialog, a banner, a page state, an animation) and the user or a reviewer should see it, put it on a canvas; do not screenshot it with browser scripts, record videos, or stand up a backend with seeded data to reach the state. The canvas shows every state side by side, live: animations play, buttons work, both themes switch.
+
+- Alias the app's source in `.design/design.json` (`"alias": { "@web/": "packages/web/src/" }`, in a monorepo also `"app": "packages/web"`), and add the component folders to `sources` so their Tailwind classes are generated.
+- One screen renders the real component with props from fixtures next to it (`screens/fixtures/`), and imports the app's own stylesheets (`import '@web/app.css'`) when the app is styled with them. Export the component from its module when it is not exported yet; that is the only change to the product's code. Each state is a canvas item with its own `props`.
+- A component that closes itself (a dialog's `onClose`) can open again after a moment, so the frame never stays empty and its entrance plays again.
+- No design system is needed for this: the screens use the app's styles.
+- Check with `$D check <canvas> --render`, look with `$D shot`, and hand over the local link (`$D preview`). It is a one-off look: do not push it unless asked.
 
 ## The app's own screens on the canvas
 
