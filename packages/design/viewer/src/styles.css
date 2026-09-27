@@ -127,10 +127,13 @@
     min-height: 100dvh;
   }
 
+  /* Clip, not hidden: a page sliding in (q-fade-in) would otherwise push the document past the
+     window for a moment and flash a scrollbar; clip makes no scroll container, so sticky still works. */
   #root {
     min-height: 100dvh;
     display: flex;
     flex-direction: column;
+    overflow: clip;
   }
 
   button {
