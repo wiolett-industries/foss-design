@@ -15,6 +15,8 @@ const work = fs.mkdtempSync(path.join(os.tmpdir(), 'foss-design-smoke-'))
 // A registry of its own, so previews other runs left on this machine do not count.
 const cache = path.join(work, 'cache')
 const env = { ...process.env, XDG_CACHE_HOME: cache, LOCALAPPDATA: cache, NO_COLOR: '1' }
+// On CI the preview server logs what Vite resolves and loads, for the log below when a step fails.
+if (process.env.CI) env.DEBUG = 'vite:*'
 
 function npm(args, cwd) {
   const result = spawnSync('npm', args, { cwd, env, encoding: 'utf8', shell: windows })
@@ -41,7 +43,11 @@ function design(...args) {
     process.stdout.write(error.stdout ?? '')
     process.stderr.write(error.stderr ?? '')
     const log = path.join(project, '.design', '.cache', 'server.log')
-    if (fs.existsSync(log)) console.error(`--- .design/.cache/server.log\n${fs.readFileSync(log, 'utf8').slice(-6000)}`)
+    if (fs.existsSync(log)) {
+      const lines = fs.readFileSync(log, 'utf8').split('\n')
+      const telling = lines.filter((line) => /client|error|denied|not found|404|fs\b/i.test(line)).slice(-120)
+      console.error(`--- .design/.cache/server.log (${lines.length} lines; the telling ones)\n${telling.join('\n')}`)
+    }
     throw new Error(`design ${args.join(' ')} failed`)
   }
 }
@@ -70,6 +76,18 @@ try {
   design('stop', '--all')
   if (previews().length) fail('stop --all left previews running')
   console.log('Smoke test passed.')
+} catch (error) {
+  // Ask the server that failed directly: whose 404 it is, and what it says.
+  try {
+    const state = JSON.parse(fs.readFileSync(path.join(project, '.design', '.cache', 'server.json'), 'utf8'))
+    for (const probe of ['/_fs/@vite/client', '/_fs/canvas/smoke/screens/Main.tsx']) {
+      const res = await fetch(`${state.url}${probe}`)
+      console.error(`--- GET ${probe} → ${res.status}\n${(await res.text()).slice(0, 400)}`)
+    }
+  } catch (probeError) {
+    console.error(`--- probe failed: ${probeError}`)
+  }
+  throw error
 } finally {
   try {
     execFileSync(process.execPath, [cli, 'stop', '--all'], { cwd: project, env, stdio: 'ignore' })
