@@ -108,7 +108,7 @@ export function AppTopBar() {
       <Bar>
         {slots.barStart}
         <div className="flex min-w-0 items-center gap-6">
-          <Wordmark name={project?.name} version={project?.version} />
+          {slots.brand ?? <Wordmark name={project?.name} version={project?.version} />}
           <Tabs location={location} />
         </div>
         <div className="ml-auto flex items-center gap-2">

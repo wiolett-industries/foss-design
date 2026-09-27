@@ -5,6 +5,11 @@ import type { ViewerSource } from './source'
 export interface ViewerSlots {
   /** At the start of every top bar. */
   barStart?: ReactNode
+  /**
+   * In place of the project wordmark on the home bar and the mark on the canvas bar: a project
+   * switcher. Links in it resolve against the viewer's base, so `/` is the project's home.
+   */
+  brand?: ReactNode
   /** At the end of every top bar. */
   barEnd?: ReactNode
   /** Full width under every top bar, above the page: a notice strip. */

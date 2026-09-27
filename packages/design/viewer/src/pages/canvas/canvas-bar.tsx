@@ -47,7 +47,9 @@ export function CanvasBar({
     <>
       <Bar>
         {slots.barStart}
-        {scope ? (
+        {slots.brand ? (
+          slots.brand
+        ) : scope ? (
           <Mark />
         ) : (
           <Tooltip content="All canvases">
