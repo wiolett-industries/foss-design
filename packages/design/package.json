@@ -1,6 +1,6 @@
 {
   "name": "foss-design",
-  "version": "0.9.5",
+  "version": "0.9.6",
   "description": "Design canvases and design systems for coding agents: live, animated, clickable screens on an infinite canvas, served locally from a .design folder.",
   "type": "module",
   "license": "MIT",
