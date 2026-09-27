@@ -128,6 +128,6 @@ Screens run in a normal browser page on `localhost`: they may call real APIs and
 
 ## Checks
 
-- `design check <canvas> --render` loads every screen in headless Chrome and reports build errors, uncaught exceptions and console errors, plus `canvas.json` problems, `go()` calls, and links that lead to no screen (grouped by path, with the screens they appear in).
+- `design check <canvas> --render` (or `<canvas>/<screen>…`, or `<canvas> --page <id>`) loads the screens in headless Chrome and reports build errors, uncaught exceptions and console errors, plus `canvas.json` problems, `go()` calls, and links that lead to no screen (grouped by path, with the screens they appear in).
 - `design shot <canvas>[/<screen>] [--theme dark] [--page <id>] [--overview]` writes PNGs and prints their paths. Read them to review the result.
 - The viewer's frames show Vite's error overlay for syntax and import errors while you edit.

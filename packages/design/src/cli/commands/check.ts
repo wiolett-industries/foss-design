@@ -73,14 +73,44 @@ async function renderFrames(jobs: FrameJob[]): Promise<FrameResult[]> {
   }
 }
 
-export async function runCheck(paths: DesignPaths, canvases: string[], options: { render: boolean; json: boolean }) {
+/**
+ * `design check [<canvas>|<canvas>/<screen>…] [--page <id>] [--render] [--json]`: the whole project,
+ * some canvases, one page of a canvas, or single screens.
+ */
+export async function runCheck(
+  paths: DesignPaths,
+  targets: string[],
+  options: { render: boolean; json: boolean; page?: string },
+) {
   const project = new DesignProject(paths, DEV_URLS)
   const known = project.canvasIds()
-  const unknown = canvases.filter((id) => !known.includes(id))
-  if (unknown.length) {
-    throw new CliError(
-      `No canvas ${unknown.map((id) => `"${id}"`).join(', ')}. Canvases: ${known.join(', ') || 'none yet'}`,
-    )
+  // Each canvas with the screens asked for; null is all of them.
+  const picked = new Map<string, Set<string> | null>()
+  for (const target of targets) {
+    const [canvasId = '', screenId] = target.split('/')
+    if (!known.includes(canvasId))
+      throw new CliError(`No canvas "${canvasId}". Canvases: ${known.join(', ') || 'none yet'}`)
+    const screens = picked.has(canvasId) ? picked.get(canvasId)! : new Set<string>()
+    if (!screenId || screens === null) picked.set(canvasId, null)
+    else picked.set(canvasId, screens.add(screenId))
+  }
+  const canvases = [...picked.keys()]
+  if (options.page) {
+    if (canvases.length !== 1)
+      throw new CliError('--page needs exactly one canvas: `design check <canvas> --page <id>`')
+    const doc = project.canvas(canvases[0]!)!.doc
+    if (!doc.pages.some((page) => page.id === options.page))
+      throw new CliError(`No page "${options.page}" in "${doc.id}". Pages: ${doc.pages.map((p) => p.id).join(', ')}`)
+  }
+  for (const [canvasId, screens] of picked) {
+    if (!screens) continue
+    const doc = project.canvas(canvasId)!.doc
+    const ids = new Set(canvasFrames(doc, '', 'light', { page: options.page, skipMissing: false }).map((job) => job.id))
+    const missing = [...screens].filter((id) => !ids.has(id))
+    if (missing.length)
+      throw new CliError(
+        `No screen ${missing.map((id) => `"${id}"`).join(', ')} in "${canvasId}"${options.page ? ` on page "${options.page}"` : ''}. Screens: ${[...ids].slice(0, 30).join(', ')}${ids.size > 30 ? ', …' : ''}`,
+      )
   }
 
   const issues = canvases.length ? canvases.flatMap((id) => project.canvas(id)?.doc.issues ?? []) : project.issues()
@@ -92,8 +122,15 @@ export async function runCheck(paths: DesignPaths, canvases: string[], options: 
     if (!wasRunning && !options.json)
       print(dim(`Started the preview server at ${server.url} (\`design stop\` stops it).`))
     const base = `http://127.0.0.1:${server.port}`
-    const docs = (canvases.length ? canvases : known).map((id) => project.canvas(id)!.doc)
-    const jobs = docs.flatMap((doc) => canvasFrames(doc, base, doc.theme ?? 'light', { includeUrls: false }))
+    const jobs = (canvases.length ? canvases : known).flatMap((id) => {
+      const doc = project.canvas(id)!.doc
+      const theme = doc.theme ?? 'light'
+      const screens = picked.get(id)
+      const filter = { includeUrls: false, page: options.page }
+      return screens
+        ? [...screens].flatMap((screen) => canvasFrames(doc, base, theme, { ...filter, id: screen }))
+        : canvasFrames(doc, base, theme, filter)
+    })
     const system = project.system()
     if (!canvases.length && system) jobs.unshift(...systemFrames(system.doc, base, 'light'))
     if (!options.json) print(dim(`Loading ${plural(jobs.length, 'frame')} in Chrome via ${server.url}…`))
@@ -120,7 +157,14 @@ export async function runCheck(paths: DesignPaths, canvases: string[], options: 
       }
     }
     if (linkIssues.length) printLinkIssues(linkIssues, project)
-    const scope = canvases.length ? plural(canvases.length, 'canvas', 'canvases') : 'the project'
+    const screens = [...picked.values()].reduce((sum, set) => sum + (set?.size ?? 0), 0)
+    const scope = !canvases.length
+      ? 'the project'
+      : screens && [...picked.values()].every(Boolean)
+        ? plural(screens, 'screen')
+        : options.page
+          ? `page "${options.page}" of ${canvases[0]}`
+          : plural(canvases.length, 'canvas', 'canvases')
     if (!errors && !warnings && !broken.length) {
       print(
         green(

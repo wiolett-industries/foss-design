@@ -47,9 +47,10 @@ ${bold('Preview')}
                                              changes, remote ahead, conflict or archived
 
 ${bold('Verify')}
-  check [canvas…] [--render] [--json]        Validate canvas.json and the system (go() is an error);
-                                             --render loads every screen in Chrome and reports runtime
-                                             errors and links that lead to no screen
+  check [<canvas>[/<screen>]…] [--page <id>] Validate canvas.json and the system (go() is an error);
+        [--render] [--json]                  --render loads every screen in Chrome and reports runtime
+                                             errors and links that lead to no screen. Narrow it to
+                                             canvases, one page (--page) or single screens
   shot <canvas>[/<screen>] [--page <id>]     Screenshot screens with Chrome (PNG paths are printed);
        [--theme light|dark] [--out <dir>]    @system or @system/<id> shoots the design system specimens
        [--overview]
@@ -199,7 +200,11 @@ async function main(argv: string[]) {
     case 'status':
       return runStatus(projectPaths(values.root))
     case 'check':
-      return runCheck(projectPaths(values.root), rest, { render: !!values.render, json: !!values.json })
+      return runCheck(projectPaths(values.root), rest, {
+        render: !!values.render,
+        json: !!values.json,
+        page: values.page,
+      })
     case 'shot': {
       if (!rest[0]) throw new CliError('Usage: design shot <canvas>[/<screen>] [--page <id>] [--theme light|dark]')
       return runShot(projectPaths(values.root), rest[0], {
