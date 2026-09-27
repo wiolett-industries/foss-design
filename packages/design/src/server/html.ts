@@ -1,6 +1,6 @@
 import type { ScreenSource } from '../core/sources'
 import { escapeHtml, scriptJson } from '../core/text'
-import type { Theme } from '../shared/types'
+import type { PublicFolder, Theme } from '../shared/types'
 
 export interface FrameHead {
   source: ScreenSource
@@ -13,6 +13,8 @@ export interface FrameHead {
   boot?: string
   snapshots: boolean
   autoHeight: boolean
+  /** design.json `public`, for root paths in the screen's code. */
+  public?: PublicFolder
 }
 
 /** Frame config and the theme applied before first paint. */
@@ -27,6 +29,7 @@ function headTags(head: FrameHead): string {
     theme: source.theme,
     snapshots: head.snapshots,
     autoHeight: head.autoHeight,
+    public: head.public,
   }
   const fallback = source.theme ?? head.theme
   const theme =

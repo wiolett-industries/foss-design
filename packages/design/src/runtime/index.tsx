@@ -5,8 +5,9 @@
  */
 import { Component, type ComponentType, type ReactNode, useSyncExternalStore } from 'react'
 import { createRoot } from 'react-dom/client'
-import type { ViewerMessage } from '../shared/types'
+import type { PublicFolder, ViewerMessage } from '../shared/types'
 import { FrameInspector } from './inspect'
+import { servePublicFolder } from './public'
 
 export { TypographySpecimen } from './typography'
 
@@ -25,6 +26,8 @@ interface FrameConfig {
   snapshots?: boolean
   /** Auto-height frames report their content height instead of the viewport. */
   autoHeight?: boolean
+  /** design.json `public`: root paths such as `/logo.png` load from there. */
+  public?: PublicFolder
 }
 
 export interface HotContext {
@@ -43,6 +46,8 @@ const config: FrameConfig = window.__DESIGN__ ?? { key: '', canvas: '', id: '', 
 const embedded = window.parent !== window
 const query = new URLSearchParams(window.location.search)
 const capture = query.has('capture')
+// Before any screen code runs: the screen's first render may already point at `/logo.png`.
+servePublicFolder(config.public)
 
 let theme: Theme = config.theme ?? (query.get('theme') === 'dark' ? 'dark' : 'light')
 const themeListeners = new Set<() => void>()

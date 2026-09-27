@@ -104,12 +104,18 @@ export class Entries {
     this.prune(this.dir, wanted)
   }
 
-  /** Entry files, for dependency pre-bundling. */
+  /**
+   * What the dev server scans for dependencies before any frame loads: the generated entries,
+   * the HTML screens and the boot they load. A dependency found only once frames load makes
+   * Vite bundle again and fail the requests in flight (504 Outdated Optimize Dep).
+   */
   files(): string[] {
-    return this.project
-      .sources()
-      .filter((source) => source.format === 'module')
-      .map((source) => this.entryFile(source))
+    const files = [path.join(this.dir, HTML_BOOT)]
+    for (const source of this.project.sources()) {
+      if (source.format === 'module') files.push(this.entryFile(source))
+      else if (!source.builtin && fs.existsSync(source.file)) files.push(source.file)
+    }
+    return files
   }
 
   private prune(dir: string, wanted: Set<string>) {

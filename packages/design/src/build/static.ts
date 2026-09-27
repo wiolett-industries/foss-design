@@ -146,6 +146,8 @@ export async function buildSite(paths: DesignPaths, out: string, options: BuildO
   const entries = new Entries(project)
   entries.sync()
   linkShippedPackages(paths)
+  const publicDir = project.publicDir()
+  const publicFiles = project.publicFiles()
 
   // Stage one HTML page per frame at the path it will have in the site.
   const staging = path.join(paths.cache, 'build', 'src')
@@ -168,6 +170,8 @@ export async function buildSite(paths: DesignPaths, out: string, options: BuildO
       fonts,
       snapshots: false,
       autoHeight: source.autoHeight ?? false,
+      // The public folder lands at the site root, which frames reach through `../`.
+      public: publicFiles.length ? { base: `${toPosix(path.relative(dir, staging))}/`, files: publicFiles } : undefined,
     }
     if (source.format === 'module') {
       fs.writeFileSync(file, moduleShell(head, relUrl(dir, entries.entryFile(source))))
@@ -200,6 +204,8 @@ export async function buildSite(paths: DesignPaths, out: string, options: BuildO
         target: 'es2022',
         reportCompressedSize: false,
         chunkSizeWarningLimit: 8000,
+        // Copied below, without dot-files and links out of the folder, and after the site's own files.
+        copyPublicDir: false,
         rolldownOptions: { input: inputs },
       },
     })
@@ -268,6 +274,16 @@ export async function buildSite(paths: DesignPaths, out: string, options: BuildO
     ...canvases.flatMap((canvas) => canvas.doc.issues),
   ].filter((issue) => issue.severity === 'error').length
   const { absoluteAssets } = options.includeViewer === false ? { absoluteAssets: false } : copyViewer(PKG.viewer, out)
+  // The public folder at the site root, in every unit build: a push uploads it with the build,
+  // so it counts toward the cloud storage like any other file. Paths the site uses itself win.
+  if (publicDir) {
+    for (const rel of publicFiles) {
+      const to = path.join(out, rel)
+      if (fs.existsSync(to)) continue
+      fs.mkdirSync(path.dirname(to), { recursive: true })
+      fs.copyFileSync(path.join(publicDir, rel), to)
+    }
+  }
   return { out, canvases: canvasIds, frames: inputs.length, errors, absoluteAssets }
 }
 

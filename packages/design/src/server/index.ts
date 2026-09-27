@@ -16,7 +16,7 @@ import { type FrameHead, injectIntoHtml, moduleShell, optsOutOfSystem } from './
 import { linkShippedPackages } from './links'
 import { SnapshotStore } from './snapshots'
 import { clearState, writeState } from './state'
-import { baseConfig } from './vite'
+import { baseConfig, dropStaleDepCache } from './vite'
 
 /** 0: any free port, so previews of several projects run side by side. */
 export const DEFAULT_PORT = 0
@@ -85,6 +85,7 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
   const events = new EventHub()
   const httpServer = http.createServer()
 
+  dropStaleDepCache(paths)
   const base = baseConfig(project)
   const vite: ViteDevServer = await createServer({
     ...base,
@@ -107,6 +108,15 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
     },
   })
 
+  const publicDir = project.publicDir()
+  const servePublic = publicDir ? sirv(publicDir, { dev: true }) : null
+  const publicRel = (encoded: string) => {
+    try {
+      return decodeURIComponent(encoded)
+    } catch {
+      return null
+    }
+  }
   const viewer = fs.existsSync(PKG.viewer) ? sirv(PKG.viewer, { dev: true, etag: true }) : null
   const viewerIndex = path.join(PKG.viewer, 'index.html')
   // The viewer is built with relative asset URLs; a base keeps them right on nested routes like /c/x/p/y.
@@ -129,6 +139,8 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
       fonts: project.system()?.doc.fonts ?? [],
       snapshots: source.canvas !== SYSTEM_CANVAS,
       autoHeight: source.autoHeight ?? false,
+      // Vite serves the public folder under the frames' base.
+      public: { base: '/_fs/', files: project.publicFiles() },
       ...extra,
     }
   }
@@ -202,15 +214,26 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
         return
       }
       if (url.pathname.startsWith('/_fs/')) {
+        // Vite serves the whole public folder under the base; dot-files and links out of it stay private.
+        const rel = publicRel(url.pathname.slice('/_fs/'.length))
+        if (publicDir && rel !== null && !project.isPublicFile(rel) && fs.existsSync(path.join(publicDir, rel))) {
+          notFoundPage(res, 'Not found', url.pathname)
+          return
+        }
         vite.middlewares(req, res, () => notFoundPage(res, 'Not found', url.pathname))
         return
       }
       if (viewer) {
+        const notViewer = () => {
+          // A root path the runtime has not pointed at the frames' base yet, e.g. from markup set with innerHTML.
+          const rel = publicRel(url.pathname.slice(1))
+          if (servePublic && rel !== null && project.isPublicFile(rel))
+            servePublic(req, res, () => notFoundPage(res, 'Not found', url.pathname))
+          else if (path.extname(url.pathname)) notFoundPage(res, 'Not found', url.pathname)
+          else serveViewerIndex(res)
+        }
         if (url.pathname === '/' || url.pathname === '/index.html') serveViewerIndex(res)
-        else
-          viewer(req, res, () =>
-            path.extname(url.pathname) ? notFoundPage(res, 'Not found', url.pathname) : serveViewerIndex(res),
-          )
+        else viewer(req, res, notViewer)
       } else notFoundPage(res, 'Viewer is not built', 'Run `pnpm build` in the foss-design package.')
     } catch (error) {
       fail(error)
@@ -235,6 +258,7 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
     }, 60)
   }
   vite.watcher.on('all', (event, file) => {
+    if (publicDir && isInside(publicDir, file)) project.invalidatePublic()
     const rel = toPosix(path.relative(paths.design, file))
     if (rel.startsWith('..') || rel.startsWith('.cache/') || rel.startsWith('node_modules/')) return
     if (rel === 'design.json') {

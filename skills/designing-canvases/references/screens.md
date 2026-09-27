@@ -61,6 +61,8 @@ export default function SignUp({ error }: { error?: string }) {
 
 When screens import project components that style themselves with Tailwind classes, add their folders to `sources` in `.design/design.json` (`{ "sources": ["src/components"] }`) so those classes are generated.
 
+When the app loads files from its public folder by root path (`<img src="/logo.png">`, `fetch('/config.json')`), point `public` in `.design/design.json` at that folder (`{ "public": "public" }`, relative to the project root) and run `design preview --restart`. Screens then load those paths as the app does, locally and in the cloud; dot-files and `node_modules` in the folder are left out. `design push` uploads the folder's files with every canvas it builds, so they count toward the cloud storage like the rest of the canvas (a file shared by several canvases counts once). A push rebuilds only the canvases that changed; after changing files in the public folder alone, `design push system` rebuilds and uploads every canvas with them.
+
 In foss-design Cloud, `design push` builds the screens on this machine and uploads the result, so aliased project components show in the cloud as they do locally. A collaborator who pulls the canvas needs the same repository to preview it locally.
 
 ## Styles
@@ -90,7 +92,7 @@ import { useTheme, useScreen } from '@design/runtime'
 | `useTheme(): 'light' \| 'dark'` | The theme the frame is shown in; re-renders on change. |
 | `useScreen(): { canvas, id, props }` | Where this frame sits and the props `canvas.json` gave it. |
 
-`go()` was removed in 0.5: `design check` reports it as an error and `design push` refuses screens that use it.
+`go()` was removed in 0.5: `design check` reports it as an error, in screens and in the scripts beside them, and `design push` refuses canvases that use it.
 
 ## Links between screens
 

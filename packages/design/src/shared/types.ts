@@ -331,3 +331,11 @@ export type ViewerMessage =
   | { source: 'design-viewer'; type: 'inspect'; on: boolean; tokens?: Token[] }
   /** Pick an element by the `ref` a previous report gave it, or clear the pick without reporting. */
   | { source: 'design-viewer'; type: 'inspect-select'; ref: number | null }
+
+/** design.json `public` as a frame sees it. */
+export interface PublicFolder {
+  /** Where the folder's files are, relative to the frame's URL. */
+  base: string
+  /** Its files, relative to the folder, with forward slashes. */
+  files: string[]
+}

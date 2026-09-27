@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { mapLimit } from '../capture/frames'
 import { CliError } from '../cli/log'
-import { GO_REMOVED, legacyGoLines } from '../core/canvas'
+import { canvasCodeFiles, GO_REMOVED, legacyGoLines } from '../core/canvas'
 import { relToRoot } from '../core/paths'
 import { DesignProject } from '../core/project'
 import { STATIC_URLS } from '../core/sources'
@@ -297,8 +297,9 @@ function refuseLegacyGo(paths: SyncContext['paths'], keys: Iterable<string>) {
   const hits = new Set<string>()
   for (const key of keys) {
     if (!key.startsWith('canvas/')) continue
-    for (const screen of project.canvas(key.slice('canvas/'.length))?.screens ?? []) {
-      for (const line of legacyGoLines(screen.file)) hits.add(`${relToRoot(paths, screen.file)}:${line}`)
+    const id = key.slice('canvas/'.length)
+    for (const file of canvasCodeFiles(path.join(paths.canvases, id), project.canvas(id)?.screens ?? [])) {
+      for (const line of legacyGoLines(file)) hits.add(`${relToRoot(paths, file)}:${line}`)
     }
   }
   if (!hits.size) return

@@ -51,7 +51,7 @@ Requirements: Node.js 20.19 or newer. `check --render` and `shot` use an install
 
 ```
 .design/
-  design.json                  name, import aliases, extra Tailwind sources, port
+  design.json                  name, import aliases, extra Tailwind sources, public folder, port
   system/
     system.json                name, description, web fonts, optional custom stylesheet
     tokens.css                 CSS variables (light, dark) and the @theme mapping to Tailwind
@@ -92,7 +92,7 @@ A minimal `canvas.json`:
 }
 ```
 
-Screens get Tailwind v4 with the design tokens, React, `motion`, `lucide-react`, `clsx` and `tailwind-merge` even when the project has none of them (the project's own copies win when present), plus the project's other packages and any aliases from `design.json`. Screens link like the app does: give each screen its app URL as `route` in `canvas.json` (`"route": "/orders/:id"`), and a plain `<a href="/orders/42">` or a router's `navigate()` in any screen opens the screen whose route matches. Other links and forms never take the frame off its screen, and `design check --render` lists links that lead to no screen. (`go()` from `@design/runtime` was removed in 0.5.)
+Screens get Tailwind v4 with the design tokens, React, `motion`, `lucide-react`, `clsx` and `tailwind-merge` even when the project has none of them (the project's own copies win when present), plus the project's other packages and any aliases from `design.json`. `"public": "public"` in `design.json` serves the app's public folder at the root of every screen, so `/logo.png` loads as it does in the app; `design push` uploads it with each canvas, within the account's storage. Screens link like the app does: give each screen its app URL as `route` in `canvas.json` (`"route": "/orders/:id"`), and a plain `<a href="/orders/42">` or a router's `navigate()` in any screen opens the screen whose route matches. Other links and forms never take the frame off its screen, and `design check --render` lists links that lead to no screen. (`go()` from `@design/runtime` was removed in 0.5.)
 
 The complete formats are in the skills: [canvas.json](skills/designing-canvases/references/canvas-json.md), [screens and runtime](skills/designing-canvases/references/screens.md), [design system](skills/building-design-systems/references/system-format.md).
 

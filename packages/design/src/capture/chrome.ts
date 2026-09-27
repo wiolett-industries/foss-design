@@ -47,28 +47,51 @@ export interface FrameReport {
   ready: boolean
 }
 
+/** Vite answers this while it bundles dependencies it just found; the page loads fine once it is done. */
+const OUTDATED_DEP = /Outdated Optimize Dep/
+
 /** Open a frame URL and wait until the runtime says it is ready (fonts loaded, first paint done). */
 export async function openFrame(
   page: Page,
   url: string,
   options: { timeoutMs?: number; settleMs?: number; waitForReady?: boolean } = {},
 ): Promise<FrameReport> {
-  const errors: string[] = []
-  page.on('pageerror', (error) => errors.push(error.message))
+  let errors: string[] = []
+  // Resolves when Vite turns a request away while it bundles again; the frame is then loaded once more.
+  let outdated: () => void = () => {}
+  const record = (text: string) => {
+    errors.push(text)
+    if (OUTDATED_DEP.test(text)) outdated()
+  }
+  page.on('pageerror', (error) => record(error.message))
   page.on('console', (message) => {
+    if (message.type() !== 'error') return
     // Format strings ("%o\n\n%s") arrive unexpanded with the arguments appended; keep the arguments.
-    if (message.type() === 'error') errors.push(message.text().replace(/^(?:\s*%[osdifcO])+\s*/, ''))
+    let text = message.text().replace(/^(?:\s*%[osdifcO])+\s*/, '')
+    // Chrome leaves the URL out of a failed load; it is the one thing needed to fix it.
+    const where = message.location().url
+    if (/^Failed to load resource/.test(text) && where && !text.includes(where)) text += ` (${where})`
+    record(text)
   })
-  await page.goto(url, { waitUntil: 'load', timeout: options.timeoutMs ?? 30000 })
-  // Pages without the runtime (url items) never signal; for them loading is ready enough.
-  let ready = options.waitForReady === false
-  if (!ready) {
-    try {
-      await page.waitForFunction(() => (window as { __DESIGN_READY__?: boolean }).__DESIGN_READY__ === true, null, {
-        timeout: options.timeoutMs ?? 20000,
-      })
-      ready = true
-    } catch {}
+  let ready = false
+  for (let attempt = 0; attempt < 2; attempt++) {
+    errors = []
+    // Pages without the runtime (url items) never signal; for them loading is ready enough.
+    ready = options.waitForReady === false
+    const turnedAway = new Promise<'outdated'>((resolve) => {
+      outdated = () => resolve('outdated')
+    })
+    await page.goto(url, { waitUntil: 'load', timeout: options.timeoutMs ?? 30000 })
+    if (!ready) {
+      const signal = page
+        .waitForFunction(() => (window as { __DESIGN_READY__?: boolean }).__DESIGN_READY__ === true, null, {
+          timeout: options.timeoutMs ?? 20000,
+        })
+        .then(() => 'ready' as const)
+      signal.catch(() => {})
+      ready = (await Promise.race([signal, turnedAway]).catch(() => null)) === 'ready'
+    }
+    if (!errors.some((error) => OUTDATED_DEP.test(error))) break
   }
   // Let entrance animations finish before anyone looks.
   await page.waitForTimeout(options.settleMs ?? 700)

@@ -1,7 +1,10 @@
+import { createHash } from 'node:crypto'
+import fs from 'node:fs'
 import path from 'node:path'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import type { Alias, InlineConfig } from 'vite'
+import { type DesignPaths, PKG } from '../core/paths'
 import type { DesignProject } from '../core/project'
 import { toPosix } from '../core/text'
 
@@ -26,6 +29,28 @@ export function aliases(project: DesignProject): Alias[] {
   return list
 }
 
+/**
+ * Drop the pre-bundled deps when the runtime changed since they were built.
+ * Vite keys that cache on the project's lockfile and the config only, and the
+ * runtime comes in through a link, so a new foss-design would keep the old copy.
+ */
+export function dropStaleDepCache(paths: DesignPaths) {
+  const dir = path.join(paths.cache, 'vite')
+  const stamp = path.join(paths.cache, 'vite-runtime')
+  let runtime = ''
+  try {
+    runtime = createHash('sha256').update(fs.readFileSync(PKG.runtime)).digest('hex')
+  } catch {}
+  let seen = ''
+  try {
+    seen = fs.readFileSync(stamp, 'utf8')
+  } catch {}
+  if (seen === runtime) return
+  fs.rmSync(dir, { recursive: true, force: true })
+  fs.mkdirSync(paths.cache, { recursive: true })
+  fs.writeFileSync(stamp, runtime)
+}
+
 /** What the dev server and the static build share. */
 export function baseConfig(project: DesignProject): InlineConfig {
   const { paths } = project
@@ -34,7 +59,8 @@ export function baseConfig(project: DesignProject): InlineConfig {
     envDir: false,
     root: paths.design,
     cacheDir: path.join(paths.cache, 'vite'),
-    publicDir: false,
+    // design.json `public`: served under the frames' base, so HTML and CSS paths such as `/logo.png` resolve.
+    publicDir: project.publicDir() ?? false,
     logLevel: 'warn',
     clearScreen: false,
     resolve: {

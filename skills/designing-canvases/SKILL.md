@@ -125,7 +125,7 @@ Never publish through Claude Artifacts, and never paste screen source into chat 
 - `canvas.json` is strict: unknown keys are errors, ids are `[A-Za-z0-9_-]` starting with a letter or digit, and a page has either `sections` or free-layout `items`, not both. `$D check` names the exact path (`pages[0].sections[1].items[2].src`).
 - A module screen must export a component (default export preferred). A screen that throws shows the error in its frame and in `check --render`.
 - Screens are isolated: state, props and theme do not cross frames. Share code through `@system/components/...` or a module both screens import.
-- After changing `alias` in `.design/design.json`, run `$D preview --restart`.
+- After changing `alias` or `public` in `.design/design.json`, run `$D preview --restart`.
 - Do not edit `.design/.cache/`: it is generated.
 - The viewer runs on a free port picked at start (several projects can preview at once); always use the URL `$D preview` prints. It stays the same while that server runs.
 

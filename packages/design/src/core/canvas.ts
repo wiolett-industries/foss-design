@@ -287,7 +287,7 @@ export function loadCanvas(
     doc.pages.push(out)
   })
 
-  checkNavigation(doc, screens, issues, fileRel, (file) => relToRoot(paths, file))
+  checkNavigation(doc, canvasCodeFiles(dir, screens), issues, fileRel, (file) => relToRoot(paths, file))
   return { doc, screens }
 }
 
@@ -315,10 +315,36 @@ export function legacyGoLines(file: string): number[] {
   return calls.length ? [...new Set(calls)] : [lineOf(imported.index)]
 }
 
-/** Routes two screens claim (links open the first), and screens still using the removed `go()`. */
+const CODE_FILE = /\.(?:[cm]?[jt]sx?|html?)$/i
+
+/**
+ * The canvas's screens and every script or page in its folder: a screen can reach `go()`
+ * through a shared file it loads, such as a `links.js` next to HTML screens.
+ */
+export function canvasCodeFiles(dir: string, screens: ScreenSource[]): string[] {
+  const files = new Set(screens.map((screen) => screen.file))
+  const visit = (current: string) => {
+    let entries: fs.Dirent[]
+    try {
+      entries = fs.readdirSync(current, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const entry of entries) {
+      if (entry.name.startsWith('.') || entry.name === 'node_modules') continue
+      const full = path.join(current, entry.name)
+      if (entry.isDirectory()) visit(full)
+      else if (entry.isFile() && CODE_FILE.test(entry.name)) files.add(full)
+    }
+  }
+  visit(dir)
+  return [...files]
+}
+
+/** Routes two screens claim (links open the first), and code still using the removed `go()`. */
 function checkNavigation(
   doc: CanvasDoc,
-  screens: ScreenSource[],
+  codeFiles: string[],
   issues: Issue[],
   canvasFile: string,
   rel: (file: string) => string,
@@ -341,7 +367,7 @@ function checkNavigation(
         })
     }
   }
-  for (const file of new Set(screens.map((screen) => screen.file))) {
+  for (const file of codeFiles) {
     for (const line of legacyGoLines(file)) {
       issues.push({ severity: 'error', file: rel(file), at: `line ${line}`, message: GO_REMOVED })
     }

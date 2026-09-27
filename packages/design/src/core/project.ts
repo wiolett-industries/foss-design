@@ -2,16 +2,28 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { Issue, ProjectInfo } from '../shared/types'
 import { listCanvasIds, loadCanvas, type ResolvedCanvas, summarize } from './canvas'
-import { type DesignPaths, packageVersion, relToRoot } from './paths'
+import { type DesignPaths, isInside, packageVersion, relToRoot } from './paths'
+import { publicFiles } from './public'
 import { type DesignConfig, DesignConfigSchema, describeZodError } from './schema'
 import type { ScreenSource, SnapshotLookup, UrlScheme } from './sources'
 import { loadSystem, type ResolvedSystem, SYSTEM_CANVAS, summarizeSystem } from './system'
+
+/** Why design.json `public` cannot be used, or null. Its files get pushed, so it stays inside the project. */
+function publicProblem(root: string, value: string): string | null {
+  const dir = path.resolve(root, value)
+  if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) return `no folder "${value}"`
+  const real = fs.realpathSync(dir)
+  const realRoot = fs.realpathSync(root)
+  if (real === realRoot || !isInside(realRoot, real)) return `"${value}" is not a folder inside the project`
+  return null
+}
 
 /** The `.design` folder, loaded lazily and cached until a file changes. */
 export class DesignProject {
   private configCache: { config: DesignConfig; issues: Issue[] } | null = null
   private systemCache: ResolvedSystem | null | undefined
   private canvasCache = new Map<string, ResolvedCanvas>()
+  private publicCache: { list: string[]; set: Set<string> } | null = null
 
   constructor(
     readonly paths: DesignPaths,
@@ -39,8 +51,37 @@ export class DesignProject {
         })
       }
     }
+    if (config.public !== undefined) {
+      const problem = publicProblem(this.paths.root, config.public)
+      if (problem) {
+        issues.push({ severity: 'error', file: relToRoot(this.paths, file), at: 'public', message: problem })
+        config = { ...config, public: undefined }
+      }
+    }
     this.configCache = { config, issues }
     return this.configCache
+  }
+
+  /** The public folder from design.json, when it is a folder inside the project. */
+  publicDir(): string | null {
+    const configured = this.config().config.public
+    return configured === undefined ? null : path.resolve(this.paths.root, configured)
+  }
+
+  /** The public folder's files, relative to it; `invalidatePublic` when they change. */
+  publicFiles(): string[] {
+    if (!this.publicCache) {
+      const dir = this.publicDir()
+      const list = dir ? publicFiles(dir) : []
+      this.publicCache = { list, set: new Set(list) }
+    }
+    return this.publicCache.list
+  }
+
+  /** Whether `rel` is a file the public folder serves (dot-files and links out of it are not). */
+  isPublicFile(rel: string): boolean {
+    this.publicFiles()
+    return this.publicCache?.set.has(rel) ?? false
   }
 
   name(): string {
@@ -111,6 +152,11 @@ export class DesignProject {
 
   invalidateConfig() {
     this.configCache = null
+    this.publicCache = null
+  }
+
+  invalidatePublic() {
+    this.publicCache = null
   }
 
   invalidateSystem() {
