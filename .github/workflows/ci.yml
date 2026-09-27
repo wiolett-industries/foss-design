@@ -37,3 +37,24 @@ jobs:
         run: pnpm typecheck
       - name: Build
         run: pnpm build
+
+  # The packed CLI end to end on every OS it is installed on: init, a rendered check, a shot,
+  # a build, and the preview server's lifecycle (scripts/smoke.mjs).
+  smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Smoke test the packed CLI
+        run: node scripts/smoke.mjs

@@ -40,20 +40,7 @@ jobs:
         run: pnpm build
 
       - name: Smoke test the packed CLI
-        run: |
-          set -euo pipefail
-          (cd packages/design && npm pack --pack-destination "$RUNNER_TEMP")
-          tarball=$(ls "$RUNNER_TEMP"/foss-design-*.tgz)
-          mkdir "$RUNNER_TEMP/smoke" && cd "$RUNNER_TEMP/smoke"
-          design() { npx -y --package="$tarball" foss-design "$@"; }
-          design --version
-          design init --name smoke
-          design system init
-          design new smoke
-          design check --render
-          design shot smoke
-          design build --tar
-          design stop
+        run: node scripts/smoke.mjs
 
       - name: Publish to npm
         working-directory: packages/design

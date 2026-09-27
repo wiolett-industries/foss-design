@@ -109,7 +109,8 @@ The complete formats are in the skills: [canvas.json](skills/designing-canvases/
 | `design import <folder> [--canvas <id>] [--title <title>]` | Turn an exported Claude Design project (`canvas.json` and `*.dc.html`) into a canvas, once: every template becomes a React screen (`.jsx`) with its logic and state, boards keep their pages and positions, links between boards become routes, a `theme` prop follows the viewer's switch. Files the export lacks (`/_blob/…` uploads) are listed. |
 | `design canvases [--json]` | List the canvases with pages and screens; when linked, also each one's revision, sync state, web link and public link. |
 | `design preview [--open [path]] [--port <n>] [--restart] [--foreground]` | Start the viewer in the background, or reuse the running one, and print its URL. |
-| `design stop` | Stop the viewer. |
+| `design stop [--all]` | Stop the viewer; `--all` stops every preview on this machine. |
+| `design previews [--json]` | Every preview running on this machine: project, URL, version, uptime. One that its project no longer tracks is marked as an orphan. Starting a preview stops any other server still running for the same project. |
 | `design status` | Viewer state, a project summary and, when linked, the cloud state of each unit. |
 | `design check [canvas…] [--render] [--json]` | Validate `canvas.json` and the system and report `go()` calls; `--render` loads every screen and specimen in Chrome and reports runtime errors and links that lead to no screen. |
 | `design shot <canvas>[/<screen>] [--page <id>] [--theme light\|dark] [--out <dir>] [--overview]` | Screenshot screens (or whole pages with `--overview`; `@system[/<id>]` for specimens); prints the PNG paths. |

@@ -8,7 +8,7 @@ import { runLink, runLogin, runLogout } from './commands/cloud'
 import { runIcon } from './commands/icon'
 import { runImport } from './commands/import'
 import { runMerge } from './commands/merge'
-import { runPreview, runStop } from './commands/preview'
+import { runPreview, runPreviews, runStop, runStopAll } from './commands/preview'
 import { runRename } from './commands/rename'
 import { runInit, runNew, runSystemInit } from './commands/scaffold'
 import { runShot } from './commands/shot'
@@ -39,7 +39,9 @@ ${bold('Preview')}
                                              it; one from another version restarts) and print its URL;
                                              --open also opens a browser
           [--restart] [--foreground]
-  stop                                       Stop the viewer
+  stop [--all]                               Stop the viewer; --all stops every preview on this machine
+  previews [--json]                          Every preview running on this machine: project, URL,
+                                             version, uptime; orphans (a project's untracked server) marked
   status                                     Viewer state, a project summary and, with a cloud link, the
                                              account, the linked project and each unit: in sync, local
                                              changes, remote ahead, conflict or archived
@@ -125,6 +127,7 @@ async function main(argv: string[]) {
       open: { type: 'boolean' },
       port: { type: 'string' },
       restart: { type: 'boolean' },
+      all: { type: 'boolean' },
       foreground: { type: 'boolean' },
       render: { type: 'boolean' },
       json: { type: 'boolean' },
@@ -190,7 +193,9 @@ async function main(argv: string[]) {
       })
     }
     case 'stop':
-      return runStop(projectPaths(values.root))
+      return values.all ? runStopAll() : runStop(projectPaths(values.root))
+    case 'previews':
+      return runPreviews({ json: !!values.json })
     case 'status':
       return runStatus(projectPaths(values.root))
     case 'check':

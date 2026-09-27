@@ -4,7 +4,16 @@ import { type DesignPaths, PKG, packageVersion } from '../../core/paths'
 import { DesignProject } from '../../core/project'
 import { DEV_URLS } from '../../core/sources'
 import { startDevServer } from '../../server'
-import { clearState, liveServer, logFile, readState, type ServerState } from '../../server/state'
+import {
+  clearState,
+  listPreviews,
+  liveServer,
+  logFile,
+  pidAlive,
+  readState,
+  type ServerState,
+  stopPreview,
+} from '../../server/state'
 import { bold, CliError, dim, print } from '../log'
 
 export function openBrowser(url: string) {
@@ -14,7 +23,7 @@ export function openBrowser(url: string) {
       : process.platform === 'win32'
         ? ['cmd', ['/c', 'start', '""', url]]
         : ['xdg-open', [url]]
-  const child = spawn(command, args as string[], { stdio: 'ignore', detached: true })
+  const child = spawn(command, args as string[], { stdio: 'ignore', detached: true, windowsHide: true })
   child.on('error', () => {})
   child.unref()
 }
@@ -70,11 +79,22 @@ export async function ensureServer(
   if (stale)
     print(dim(`Restarting the preview server: it runs foss-design ${live.version}, this is ${packageVersion()}.`))
   if (live) await stopServer(paths)
+  // Any other server still running for this project goes too: one busy past the health check
+  // (a big canvas loading) would otherwise keep running untracked once server.json names the new one.
+  const recorded = readState(paths)
+  if (recorded && pidAlive(recorded.pid)) await stopPreview(recorded)
+  for (const other of listPreviews()) if (other.root === paths.root) await stopPreview(other)
   fs.mkdirSync(paths.cache, { recursive: true })
   const log = fs.openSync(logFile(paths), 'w')
   const args = [PKG.cli, 'preview', '--foreground', '--root', paths.root]
   if (options.port) args.push('--port', String(options.port))
-  const child = spawn(process.execPath, args, { detached: true, stdio: ['ignore', log, log], cwd: paths.root })
+  // windowsHide: on Windows a detached process gets a console window of its own otherwise.
+  const child = spawn(process.execPath, args, {
+    detached: true,
+    windowsHide: true,
+    stdio: ['ignore', log, log],
+    cwd: paths.root,
+  })
   child.unref()
   const state = await waitForServer(paths, 40000)
   if (!state) {
@@ -107,4 +127,32 @@ export async function runPreview(
 
 export async function runStop(paths: DesignPaths) {
   print((await stopServer(paths)) ? 'Stopped the preview server.' : 'No preview server is running for this project.')
+}
+
+const since = (iso: string) => {
+  const minutes = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000))
+  return minutes < 60 ? `${minutes}m` : `${Math.floor(minutes / 60)}h ${minutes % 60}m`
+}
+
+/** `design previews [--json]`: every preview server on this machine, orphans marked. */
+export function runPreviews(options: { json: boolean }) {
+  const previews = listPreviews()
+  if (options.json) return print(JSON.stringify({ previews }, null, 2))
+  if (!previews.length) return print('No preview servers are running.')
+  for (const preview of previews) {
+    const orphan = preview.tracked ? '' : ` ${bold('orphan')} ${dim('(its project names another server)')}`
+    print(`${preview.url}  ${preview.root}${orphan}`)
+    print(dim(`  foss-design ${preview.version} · pid ${preview.pid} · up ${since(preview.startedAt)}`))
+  }
+}
+
+/** `design stop --all`: every preview server on this machine. */
+export async function runStopAll() {
+  const previews = listPreviews()
+  for (const preview of previews) await stopPreview(preview)
+  print(
+    previews.length
+      ? `Stopped ${previews.length} preview server${previews.length === 1 ? '' : 's'}.`
+      : 'No preview servers are running.',
+  )
 }
