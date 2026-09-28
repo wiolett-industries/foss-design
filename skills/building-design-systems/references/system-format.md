@@ -31,7 +31,7 @@ The stylesheet every screen gets, after Tailwind v4. It is plain CSS with Tailwi
 | Scope | Where | Meaning |
 | --- | --- | --- |
 | Light | rules on `:root`, `html`, `:host` | Base values. |
-| Dark | rules whose selector has `[data-theme="dark"]` (also `data-mode`, `data-color-scheme`), `.dark`, `.theme-dark`, or any rule inside `@media (prefers-color-scheme: dark)` | Overrides for the dark theme. The viewer sets `data-theme` and the `dark` class on `<html>`, so `:root[data-theme="dark"]` is the canonical form. |
+| Dark | rules whose selector has `[data-theme="dark"]` (also `data-mode`, `data-color-scheme`), `.dark`, `.theme-dark`, or any rule inside `@media (prefers-color-scheme: dark)` | Overrides for the dark theme. The viewer sets all of those on `<html>` (`data-theme`, `data-mode`, `data-color-scheme`, the `dark` and `theme-dark` classes) and makes `prefers-color-scheme` in frames answer by its toggle, so every form switches; `:root[data-theme="dark"]` is the canonical one. |
 | Theme | `@theme`, `@theme inline`, `@theme static` blocks | Tailwind namespaces that become utilities. |
 
 Declarations whose value is `initial`, and wildcard resets (`--color-*: initial`), are skipped.
@@ -254,7 +254,7 @@ Anything under `assets/` (subfolders included) is listed on the Assets page: ima
 
 Two ways to make the system the product's own code instead of a copy:
 
-- **The app's stylesheet.** Set `"stylesheet": "../../src/styles.css"` in `system.json` (relative to the system folder). It replaces the default entry entirely, so it must import Tailwind itself (resolved from the project's `node_modules`) and define its own dark handling; foss-design still adds `.design` as a Tailwind source. The viewer reads tokens from it and from the local files it `@import`s.
+- **The app's stylesheet.** Set `"stylesheet": "../../src/styles.css"` in `system.json` (relative to the system folder). It replaces the default entry entirely, so it must import Tailwind itself (resolved from the project's `node_modules`) and define its own dark handling (any of the forms above, a `prefers-color-scheme` query included). foss-design still adds `.design` as a Tailwind source, and the app's folder where the app's build would find its classes: `app` from `design.json`, else the package the stylesheet belongs to. The viewer reads tokens from it and from the local files it `@import`s.
 - **The app's components.** Alias the project's source folder in `.design/design.json` and import from it in screens and specimens; add the folder to `sources` so its classes are generated:
 
   ```json

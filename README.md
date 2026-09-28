@@ -51,7 +51,7 @@ Requirements: Node.js 20.19 or newer. `check --render` and `shot` use an install
 
 ```
 .design/
-  design.json                  name, import aliases, the app package in a monorepo, extra Tailwind sources, public folder, port
+  design.json                  name, import aliases, the app package in a monorepo, extra Tailwind sources, public folder, the app's Vite plugins screens use, port
   icon.svg                     the project icon (`design icon`; also .png or .webp, at most 256 KB)
   system/
     system.json                name, description, web fonts, optional custom stylesheet
@@ -94,7 +94,7 @@ A minimal `canvas.json`:
 }
 ```
 
-Screens get Tailwind v4 with the design tokens, React, `motion`, `lucide-react`, `clsx` and `tailwind-merge` even when the project has none of them (the project's own copies win when present), plus the project's other packages and any aliases from `design.json`. `"public": "public"` in `design.json` serves the app's public folder at the root of every screen, so `/logo.png` loads as it does in the app; `design push` uploads it with each canvas, within the account's storage. Screens link like the app does: give each screen its app URL as `route` in `canvas.json` (`"route": "/orders/:id"`), and a plain `<a href="/orders/42">` or a router's `navigate()` in any screen opens the screen whose route matches. Other links and forms never take the frame off its screen, and `design check --render` lists links that lead to no screen. (`go()` from `@design/runtime` was removed in 0.5.)
+Screens get Tailwind v4 with the design tokens, React, `motion`, `lucide-react`, `clsx` and `tailwind-merge` even when the project has none of them (the project's own copies win when present), plus the project's other packages and any aliases from `design.json`. Screens get the app's `import.meta.env.VITE_*` from its `.env` files, as the app does. `"vitePlugins": ["vite-plugin-svgr"]` in `design.json` gives screens plugins of the app's own `vite.config` (for `*.svg?react`, say): `design.json` only names them, and they come with the options the app gives them. `"public": "public"` in `design.json` serves the app's public folder at the root of every screen, so `/logo.png` loads as it does in the app; `design push` uploads it with each canvas, within the account's storage. Screens link like the app does: give each screen its app URL as `route` in `canvas.json` (`"route": "/orders/:id"`), and a plain `<a href="/orders/42">` or a router's `navigate()` in any screen opens the screen whose route matches. Other links and forms never take the frame off its screen, and `design check --render` lists links that lead to no screen. (`go()` from `@design/runtime` was removed in 0.5.)
 
 The complete formats are in the skills: [canvas.json](skills/designing-canvases/references/canvas-json.md), [screens and runtime](skills/designing-canvases/references/screens.md), [design system](skills/building-design-systems/references/system-format.md).
 
@@ -120,7 +120,7 @@ The complete formats are in the skills: [canvas.json](skills/designing-canvases/
 | `design login` / `design logout` | Sign this machine in to [foss-design Cloud](#cloud) or forget its token. |
 | `design me [--json]` | The signed-in cloud account: plan and its end date, storage, active projects, canvases, pushes, and the linked project. |
 | `design link [<project>] [--new <name>]` | List your cloud projects, or link `.design` to one (or to a new one). |
-| `design push [canvas…] [--resolved <unit>] [--json]` | Build and upload what changed, with progress, then print the web link of each pushed canvas. When the cloud is ahead it pulls and merges first and pushes on a clean merge; it stops on conflicts. Takes the snapshots each pushed canvas lacks, in both themes (Chrome, with progress; the first push of a big canvas takes a few minutes), so the cloud shows every screen in the theme it is looked at before its frame runs. |
+| `design push [canvas…] [--resolved <unit>] [--json]` | Build and upload what changed, with progress, then print the web link of each pushed canvas. A canvas whose screens use files from outside its folder (another canvas's screen, a shared module, the app's components) is pushed again when those change; `design status` says which. A request that could not connect is tried again a few times. When the cloud is ahead it pulls and merges first and pushes on a clean merge; it stops on conflicts. Takes the snapshots each pushed canvas lacks, in both themes (Chrome, with progress; the first push of a big canvas takes a few minutes), so the cloud shows every screen in the theme it is looked at before its frame runs. |
 | `design snapshots [<canvas>[/<screen>]…] [--page <id>]` | Take the snapshots screens lack or have outdated, in both themes (the one a screen pins), for the local viewer. |
 | `design pull [canvas…] [--theirs <unit>] [--json]` | Take cloud changes. A unit changed on both sides merges three ways against the last synced revision: a file changed on one side takes it, text changed on both merges line by line; what does not merge is a conflict (exit 2) for `design merge`. |
 | `design merge [<unit\|file>…] [--here\|--cloud] [--done] [--json]` | The conflicts a merge left: lists them (and in a terminal walks through them: keep here, take the cloud's, edit, skip); `--here` / `--cloud` settles files or whole units; `--done` closes a merge once no conflict markers are left. Every side stays in `.design/.cache/cloud/merge/` until then. |
@@ -129,6 +129,8 @@ The complete formats are in the skills: [canvas.json](skills/designing-canvases/
 | `design rollback <canvas> <rev>` | Make an old revision current again in the cloud (as a new revision), then pull it. |
 | `design publish <canvas>[/<screen>]` / `design unpublish <canvas>[/<screen>]` | Give the canvas a public link anyone can open, or turn it off (owner only). With a screen, the link opens that screen alone: its address names nothing of the project, it loads only that screen's files, and links in it open only other screens published the same way. |
 | `design archive <canvas>` / `design unarchive <canvas>` | Archive a canvas in the cloud (out of the list and pushes, history kept), or bring it back. |
+| `design page <file.html\|folder> [--name <slug>] [--title <title>] [--project <id>] [--public] [--json]` | Publish an HTML file, or a folder with an `index.html` and what it loads, as a page of your [pages project](#pages) (made on first use; no `.design` needed). The same name (by default the file or folder name) again is a new version at the same links. Prints the page's link for the project's members; `--public` also gives it a link anyone can open (owner only). |
+| `design pages [--project <id>] [--json]` | The pages of your pages project: name, title, version, size, public link. |
 
 `--root <dir>` points any command at a project; by default the nearest folder with `.design` is used. The viewer listens on a free port picked at start, so several projects can preview at once; `--port` or `"port"` in `design.json` pins one. It opens a browser only with `--open`.
 
@@ -161,6 +163,10 @@ design login               # prints a link with the code in it; open it and conf
 design link --new "My app" # or design link <project-id>
 design push                # and design pull on another machine
 ```
+
+### Pages
+
+A pages project holds HTML pages instead of canvases: reports, write-ups, one-off pages an agent made and the user wants at a link. `design page report.html` (or a folder with an `index.html`) uploads one into your pages project, which it makes on first use, and prints its link; the project's members open it in the web app, and `--public` gives it a link anyone can open, `/a/<id>`, which names nothing of the project and stays the same across versions. Publishing the same name again replaces what the links show. A page is plain HTML: scripts and styles from CDNs load, links to other sites open in a new tab (`design page` puts a small script into each HTML file for that), and forms send nothing. The Free plan has one pages project of up to 5 pages and keeps only the latest version of each.
 
 ## Turn off Claude Artifacts
 
