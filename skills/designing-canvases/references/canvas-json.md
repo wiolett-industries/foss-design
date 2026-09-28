@@ -20,7 +20,7 @@
 | `description` | string | | One line under the title. |
 | `system` | boolean | `true` | Inject the design system stylesheet (Tailwind v4 + tokens) into every screen. Items can override it. |
 | `theme` | `"light"` \| `"dark"` | follows the viewer | Theme screens open in. |
-| `cover` | string | first screen | The canvas's picture in lists: a screen id (its snapshot, which `design push` refreshes) or an image in the canvas folder (`"cover.png"`: PNG, JPEG, WebP or SVG, at most 512 KB, pushed with the canvas and counted in storage). |
+| `cover` | string | first screen | The canvas's picture in lists: a screen id (its snapshot, which `design push` refreshes) or an image in the canvas folder (`"cover.png"`: PNG, JPEG, WebP or SVG, at most 512 KB, pushed with the canvas and counted in storage). Lists show it at 86×54 CSS pixels (8:5), cropped to its top: a custom image works at 8:5, about 344×216, with one strong shape and no small text. |
 | `pages` | array, at least one | | Pages, in menu order. |
 | `$schema` | string | | Ignored; allowed for editors. |
 

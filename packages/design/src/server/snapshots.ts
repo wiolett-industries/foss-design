@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import { ensureThumb } from '../core/png'
@@ -8,6 +9,17 @@ interface Meta {
   height?: number
   light?: number
   dark?: number
+  /** Hash of the screen's file each theme's snapshot was taken from (see `sourceHash`). */
+  sources?: Partial<Record<Theme, string>>
+}
+
+/** What a snapshot was taken from: the screen file's content, so touching it without a change is no change. */
+export function sourceHash(file: string): string | null {
+  try {
+    return createHash('sha1').update(fs.readFileSync(file)).digest('hex').slice(0, 16)
+  } catch {
+    return null
+  }
 }
 
 const SAFE = /^@?[a-z0-9][a-z0-9_-]*$/i
@@ -27,6 +39,13 @@ export class SnapshotStore {
 
   private metaFile(canvas: string) {
     return path.join(this.dir, canvas, 'meta.json')
+  }
+
+  /** Written aside and renamed: a run stopped mid-write leaves the old file, not half of one. */
+  private writeMeta(canvas: string, data: Record<string, Meta>) {
+    const temp = `${this.metaFile(canvas)}.${process.pid}.tmp`
+    fs.writeFileSync(temp, JSON.stringify(data))
+    fs.renameSync(temp, this.metaFile(canvas))
   }
 
   private load(canvas: string): Record<string, Meta> {
@@ -66,7 +85,30 @@ export class SnapshotStore {
     return this.load(canvas)[id]?.[theme] ?? null
   }
 
-  save(canvas: string, id: string, theme: Theme, png: Buffer, height?: number): { url: string } {
+  /** The source hash recorded with the snapshot; undefined for snapshots taken before hashes were kept. */
+  source(canvas: string, id: string, theme: Theme): string | undefined {
+    if (!isSafeSegment(canvas) || !isSafeSegment(id)) return undefined
+    return this.load(canvas)[id]?.sources?.[theme]
+  }
+
+  /** Record `hash` for a snapshot taken before hashes were kept: from now on it counts as that content's. */
+  adopt(canvas: string, id: string, theme: Theme, hash: string) {
+    if (!isSafeSegment(canvas) || !isSafeSegment(id)) return
+    const data = this.load(canvas)
+    const entry = data[id]
+    if (!entry?.[theme]) return
+    entry.sources = { ...entry.sources, [theme]: hash }
+    this.writeMeta(canvas, data)
+  }
+
+  save(
+    canvas: string,
+    id: string,
+    theme: Theme,
+    png: Buffer,
+    height?: number,
+    source?: string | null,
+  ): { url: string } {
     if (!isSafeSegment(canvas) || !isSafeSegment(id)) throw new Error('bad snapshot key')
     const dir = path.join(this.dir, canvas)
     fs.mkdirSync(dir, { recursive: true })
@@ -75,11 +117,12 @@ export class SnapshotStore {
     fs.renameSync(`${file}.${process.pid}.tmp`, file)
     const data = this.load(canvas)
     const version = Date.now()
-    data[id] = { ...data[id], [theme]: version, ...(height ? { height } : {}) }
-    // Written aside and renamed: a run stopped mid-write leaves the old file, not half of one.
-    const temp = `${this.metaFile(canvas)}.${process.pid}.tmp`
-    fs.writeFileSync(temp, JSON.stringify(data))
-    fs.renameSync(temp, this.metaFile(canvas))
+    const previous = data[id]
+    const sources = { ...previous?.sources }
+    if (source) sources[theme] = source
+    else delete sources[theme]
+    data[id] = { ...previous, [theme]: version, ...(height ? { height } : {}), sources }
+    this.writeMeta(canvas, data)
     return { url: this.url(canvas, id, theme, version) }
   }
 

@@ -12,7 +12,7 @@ import { useStore } from '../../lib/store'
 import { useTheme } from '../../lib/theme'
 import { IconButton } from '../../ui/button'
 import { Icon } from '../../ui/icon'
-import { Menu, MenuItem, MenuSeparator } from '../../ui/menu'
+import { keepOpenForFrames, Menu, MenuItem, MenuSeparator } from '../../ui/menu'
 import { Notice } from '../../ui/page'
 import { NotFound } from '../not-found'
 import { CameraStore } from './camera'
@@ -436,6 +436,7 @@ function IssuesButton({ canvas }: { canvas: CanvasDoc }): ReactNode {
           align="start"
           sideOffset={8}
           collisionPadding={12}
+          onFocusOutside={keepOpenForFrames}
           className="z-50 max-h-[50vh] w-[460px] max-w-[calc(100vw-24px)] overflow-y-auto rounded-[10px] border border-rule bg-surface shadow-pop outline-none data-[state=open]:animate-[q-pop_120ms_ease-out]"
         >
           <IssueList issues={canvas.issues} />

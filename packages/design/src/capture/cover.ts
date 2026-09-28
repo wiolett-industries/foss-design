@@ -3,7 +3,7 @@ import os from 'node:os'
 import type { Progress } from '../cli/log'
 import { DesignProject } from '../core/project'
 import { DEV_URLS } from '../core/sources'
-import { SnapshotStore } from '../server/snapshots'
+import { SnapshotStore, sourceHash } from '../server/snapshots'
 import type { CanvasDoc, Theme } from '../shared/types'
 import { serveBuild } from './build-server'
 import { findChrome, launchChrome, openFrame } from './chrome'
@@ -19,11 +19,13 @@ export interface SnapshotTarget {
   canvas: string
   screen: string
   theme: Theme
+  /** Hash of the screen's file now, recorded with the snapshot. */
+  source: string | null
 }
 
 /**
  * The snapshots `canvasIds` lack: every screen in both themes (one, when the screen pins its
- * theme), missing or older than the screen's file. The viewer shows them for frames that are not
+ * theme), missing or taken from other content than the screen's file has now. The viewer shows them for frames that are not
  * running, and a pushed canvas carries them, so the cloud shows the right theme from far away too.
  */
 export function staleSnapshots(
@@ -47,13 +49,19 @@ export function staleSnapshots(
       if (filter.screens && !filter.screens.has(job.id)) continue
       const file = files.get(job.id)
       if (!file || !fs.existsSync(file)) continue
-      const changed = fs.statSync(file).mtimeMs
+      const hash = sourceHash(file)
       const pinned = inDark.get(job.id) === job.theme
       const themes = pinned ? [job.theme] : THEMES
-      const screen = { id: job.id }
       for (const theme of themes) {
-        const taken = store.version(id, screen.id, theme)
-        if (!taken || taken < changed) stale.push({ canvas: id, screen: screen.id, theme })
+        if (!store.version(id, job.id, theme)) {
+          stale.push({ canvas: id, screen: job.id, theme, source: hash })
+          continue
+        }
+        const recorded = store.source(id, job.id, theme)
+        // Taken before hashes were kept: it counts as the current content's rather than retaken.
+        if (recorded === undefined) {
+          if (hash) store.adopt(id, job.id, theme, hash)
+        } else if (recorded !== hash) stale.push({ canvas: id, screen: job.id, theme, source: hash })
       }
     }
   }
@@ -96,7 +104,7 @@ export async function takeSnapshots(
   const line = () => `Snapshots ${done}/${targets.length} (both themes, as the viewer and the cloud show them)`
   progress.update(line())
   try {
-    await mapLimit([...targets], TABS, async ({ canvas, screen, theme }) => {
+    await mapLimit([...targets], TABS, async ({ canvas, screen, theme, source }) => {
       const job = canvasFrames(docOf(canvas), url, theme, { id: screen })[0]
       if (job) {
         const page = await browser.newPage({
@@ -109,7 +117,7 @@ export async function takeSnapshots(
           if (report.ready) {
             const png = await page.screenshot({ fullPage: job.fullPage })
             const height = job.fullPage ? await page.evaluate(() => document.documentElement.scrollHeight) : undefined
-            store.save(canvas, screen, theme, png, height)
+            store.save(canvas, screen, theme, png, height, source)
           } else failed.push(`${canvas}/${screen} (${theme})`)
         } catch {
           failed.push(`${canvas}/${screen} (${theme})`)

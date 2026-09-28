@@ -1,5 +1,5 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import type { ReactNode } from 'react'
+import { type ReactNode, useState } from 'react'
 import { cn } from '../lib/cn'
 
 /** Menus and dialogs float on the same surface. */
@@ -7,6 +7,21 @@ export const floatingSurface =
   'z-50 overflow-hidden rounded-[8px] border border-rule bg-surface shadow-pop outline-none'
 
 export const menuSurface = `${floatingSurface} py-1 data-[state=open]:animate-[q-pop_120ms_ease-out] data-[state=closed]:animate-[q-pop-out_100ms_ease-in_forwards]`
+
+/** The element the pointer last went over; an iframe when the pointer is inside a frame. */
+let hovered: EventTarget | null = null
+if (typeof document !== 'undefined')
+  document.addEventListener('pointerover', (event) => (hovered = event.target), { capture: true, passive: true })
+
+/**
+ * Whether the page's focus just went into a frame that the pointer is not over: a screen focused
+ * something while it loaded (an autofocused field), which is no reason to close a menu. A click
+ * into a frame has the pointer over it and still closes.
+ */
+export function focusTakenByFrame(): boolean {
+  const active = document.activeElement
+  return active instanceof HTMLIFrameElement && hovered !== active
+}
 
 export function Menu({
   trigger,
@@ -27,8 +42,16 @@ export function Menu({
   open?: boolean
   onOpenChange?: (open: boolean) => void
 }) {
+  // Controlled here so a close caused by a frame taking focus (Radix closes on the window's blur)
+  // can be turned down.
+  const [inner, setInner] = useState(false)
+  const change = (next: boolean) => {
+    if (!next && focusTakenByFrame()) return
+    setInner(next)
+    onOpenChange?.(next)
+  }
   return (
-    <DropdownMenu.Root open={open} onOpenChange={onOpenChange} modal={false}>
+    <DropdownMenu.Root open={open ?? inner} onOpenChange={change} modal={false}>
       <DropdownMenu.Trigger asChild>{trigger}</DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content
@@ -36,6 +59,7 @@ export function Menu({
           side={side}
           sideOffset={sideOffset}
           collisionPadding={12}
+          onFocusOutside={keepOpenForFrames}
           className={menuSurface}
           // Never wider than a phone's screen.
           style={{ width, maxWidth: 'calc(100vw - 24px)' }}
@@ -45,6 +69,14 @@ export function Menu({
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
   )
+}
+
+/**
+ * A frame that focuses something while it loads (an autofocused field) takes the page's focus into
+ * its iframe; that is no reason for an open menu or popover to close. A click outside still is.
+ */
+export function keepOpenForFrames(event: Event) {
+  if (focusTakenByFrame()) event.preventDefault()
 }
 
 export const menuItemClass = (danger?: boolean, active?: boolean) =>
