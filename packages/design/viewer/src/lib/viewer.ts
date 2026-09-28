@@ -1,3 +1,4 @@
+import type { CanvasItem } from '@shared/types'
 import { createContext, type ReactNode, useContext } from 'react'
 import type { ViewerSource } from './source'
 
@@ -29,6 +30,8 @@ export interface ViewerSlots {
   canvasesAfter?: ReactNode
   /** Below the panels of the home page, full width. */
   homeAfter?: ReactNode
+  /** In the bar of the item selected on a canvas, before the way to zoom to it: sharing that screen, say. */
+  selectionActions?: (canvasId: string, item: CanvasItem) => ReactNode
   /**
    * On a screen's full-window page, the corner plate with the way out: `note` is a muted line under it
    * (whose content the screen is), `actions` sit next to the way out, and with `badge` the plate folds

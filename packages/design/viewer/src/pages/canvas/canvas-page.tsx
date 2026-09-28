@@ -80,12 +80,14 @@ function CanvasView({ canvas, page }: { canvas: CanvasDoc; page: Page | undefine
   useEffect(() => {
     if (picked) setInspect(true)
   }, [picked])
+  // Every pick selects its screen: the same screen again too, after a click beside it let go of it.
+  const pickedInfo = inspection.info
   useEffect(() => {
     const frame = inspection.frame
-    if (!frame) return
+    if (!frame || !pickedInfo) return
     const id = Object.entries(store.get().frameEls).find(([, el]) => el === frame)?.[0]
     if (id && store.get().selected !== id) store.set((state) => ({ ...state, selected: id }))
-  }, [inspection.frame, store])
+  }, [inspection.frame, pickedInfo, store])
   const order = useMemo(() => frameOrder(layout), [layout])
   const key = cameraKey(canvas.id, page?.id ?? '')
 
@@ -203,8 +205,9 @@ function CanvasView({ canvas, page }: { canvas: CanvasDoc; page: Page | undefine
           )
         } else camera.panBy(-message.deltaX, -message.deltaY)
       },
+      // Esc leaves the screen and lets go of it at once: no stop at "selected, not active".
       onEscape() {
-        store.set((state) => ({ ...state, active: null }))
+        store.set((state) => ({ ...state, active: null, selected: null }))
       },
     }),
     [canvas, page, camera, store, focusItem, navigate],
@@ -236,8 +239,7 @@ function CanvasView({ canvas, page }: { canvas: CanvasDoc; page: Page | undefine
       if (e.key === 'Escape') {
         if (inspection.info) inspection.select(null)
         else if (inspectOn) setInspect(false)
-        else if (state.active) store.set((s) => ({ ...s, active: null }))
-        else if (state.selected) store.set((s) => ({ ...s, selected: null }))
+        else if (state.active || state.selected) store.set((s) => ({ ...s, active: null, selected: null }))
       } else if (e.key === 'i' && !mod && !e.altKey) setInspect((value) => !value)
       else if (e.key === 'p' && !mod && !e.altKey) playFromBar()
       else if (e.shiftKey && e.code === 'Digit1') api?.fitAll()
@@ -322,7 +324,14 @@ function CanvasView({ canvas, page }: { canvas: CanvasDoc; page: Page | undefine
               capture={false}
               apiRef={apiRef}
               onPlay={play}
-              onSelect={select}
+              onSelect={(id) => {
+                // A click beside every item lets go of the selection and switches Inspect off.
+                if (!id) {
+                  inspection.select(null)
+                  setInspect(false)
+                }
+                select(id)
+              }}
             />
           ) : (
             <div className="canvas-dots flex h-full">

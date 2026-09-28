@@ -1,4 +1,5 @@
 import type { CanvasDoc, CanvasItem, CanvasPage as Page, Theme } from '@shared/types'
+import { AnimatePresence, motion } from 'motion/react'
 import { useRef } from 'react'
 import { Link, useLocation } from 'wouter'
 import { SearchButton } from '../../components/search-button'
@@ -141,7 +142,7 @@ export function CanvasBar({
   )
 }
 
-/** The selected item's name and actions, floating over the bottom of the canvas. */
+/** The selected item's name and actions, floating over the bottom of the canvas; it eases in and out. */
 export function SelectionBar({
   canvas,
   store,
@@ -158,37 +159,85 @@ export function SelectionBar({
   inspect: boolean
 }) {
   const selected = useStore(store, (state) => state.selected)
-  const active = useStore(store, (state) => state.active)
-  const status = useStore(store, (state) => (selected ? state.frames[selected] : undefined))
   const item = layoutItems.find((i) => i.id === selected)
-  const openUrl = useOpenUrl(canvas.id, item?.kind === 'screen' || item?.kind === 'url' ? item : undefined, theme)
-  if (!item) return null
+  return (
+    <div data-ui className="pointer-events-none absolute inset-x-0 bottom-5 z-20 flex justify-center px-4">
+      <AnimatePresence>
+        {item ? (
+          <SelectedBar
+            key="bar"
+            canvas={canvas}
+            store={store}
+            item={item}
+            theme={theme}
+            onPlay={onPlay}
+            inspect={inspect}
+          />
+        ) : null}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+function SelectedBar({
+  canvas,
+  store,
+  item,
+  theme,
+  onPlay,
+  inspect,
+}: {
+  canvas: CanvasDoc
+  store: ViewStore
+  item: CanvasItem
+  theme: Theme
+  onPlay(id: string): void
+  inspect: boolean
+}) {
+  const { slots } = useViewer()
+  const status = useStore(store, (state) => state.frames[item.id])
+  const openUrl = useOpenUrl(canvas.id, item.kind === 'screen' || item.kind === 'url' ? item : undefined, theme)
   const frame = item.kind === 'screen' || item.kind === 'url'
   const reload = () =>
     reloadFrame(document.querySelector<HTMLIFrameElement>(`[data-item="${CSS.escape(item.id)}"] iframe`))
   const errors = status?.errors ?? []
   return (
-    <div data-ui className="pointer-events-none absolute inset-x-0 bottom-5 z-20 flex justify-center px-4">
-      <div className="pointer-events-auto flex max-w-full flex-col overflow-hidden rounded-[10px] border border-rule bg-surface shadow-pop animate-[q-pop_120ms_ease-out]">
+    <motion.div
+      initial={{ opacity: 0, y: 10, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 10, scale: 0.98, transition: { duration: 0.14, ease: 'easeIn' } }}
+      transition={{ type: 'spring', duration: 0.26, bounce: 0.12 }}
+      className="relative flex w-fit max-w-[95%] min-w-0 flex-col"
+    >
+      {/* While Inspect is on (or ⌘/Ctrl held), a tab slides out from behind the bar's top edge to say
+            how it works: as wide as its text, 20px short of the bar's ends at most; the bar's border
+            stays under it. */}
+      <div className="pointer-events-none absolute inset-x-5 bottom-full flex justify-center">
+        <AnimatePresence>
+          {frame && inspect ? (
+            <motion.div
+              key="inspect"
+              initial={{ y: '100%', opacity: 0 }}
+              animate={{ y: 0, opacity: 0.9 }}
+              exit={{ y: '100%', opacity: 0 }}
+              transition={{ type: 'spring', duration: 0.28, bounce: 0.15 }}
+              className="flex h-[22px] min-w-0 items-center rounded-t-[7px] border border-b-0 border-rule bg-surface/80 px-3 text-[11.5px] whitespace-nowrap text-muted backdrop-blur-md"
+            >
+              <span className="truncate">Click an element to inspect it</span>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+      </div>
+      {/* Positioned, so it paints over the tab, which slides out from under it. */}
+      <div className="pointer-events-auto relative flex max-w-full flex-col overflow-hidden rounded-[10px] border border-rule bg-surface shadow-pop">
         {errors.length ? (
           <div className="flex max-h-40 items-start gap-2 overflow-y-auto border-b border-rule bg-danger-soft px-3.5 py-2 font-mono text-[12px] whitespace-pre-wrap text-danger-text">
             <Icon name="alert" size={14} className="mt-px" />
             <span className="min-w-0">{errors.join('\n')}</span>
           </div>
         ) : null}
-        <div className="flex h-[44px] items-center gap-1 pr-1.5 pl-3.5">
-          <div className="flex min-w-0 items-center gap-2 pr-2">
-            <span className="truncate text-[13.5px] font-medium">{item.title || item.id}</span>
-            {frame && active === item.id ? (
-              <span className="flex shrink-0 items-center gap-1.5 text-[12px] text-muted">
-                <Icon name="pointer" size={13} /> {inspect ? 'Inspecting' : 'Interacting'} <Kbd>esc</Kbd>
-              </span>
-            ) : frame ? (
-              <span className="shrink-0 text-[12px] text-muted">
-                {inspect ? 'Click an element to inspect it' : 'Click the screen to interact'}
-              </span>
-            ) : null}
-          </div>
+        <div className="flex h-[44px] items-center gap-1 pr-1.5 pl-3.5 [&>:not(:first-child)]:shrink-0">
+          <span className="min-w-0 truncate pr-2 text-[13.5px] font-medium">{item.title || item.id}</span>
           {frame ? (
             <Tooltip
               content={
@@ -227,6 +276,7 @@ export function SelectionBar({
               />
             </Tooltip>
           ) : null}
+          {slots.selectionActions?.(canvas.id, item)}
           <Tooltip
             content={
               <span className="flex items-center gap-1.5">
@@ -244,7 +294,7 @@ export function SelectionBar({
           </Tooltip>
         </div>
       </div>
-    </div>
+    </motion.div>
   )
 }
 

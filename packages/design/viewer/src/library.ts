@@ -53,6 +53,7 @@ export {
   iconButtonClass,
 } from './ui/button'
 export { Segmented, Switch } from './ui/choice'
+export { Combobox, type ComboboxOption } from './ui/combobox'
 export { CopyButton } from './ui/copy-button'
 export { Dialog } from './ui/dialog'
 export { Icon, type IconName } from './ui/icon'
