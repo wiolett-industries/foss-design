@@ -1,5 +1,6 @@
 import { compileRoute, linkPath, matchRoute } from '@shared/routes'
 import type { CanvasDoc, RuntimeMessage, Theme, ViewerMessage } from '@shared/types'
+import { isSafeHref } from '../components/markdown'
 import { toast } from '../ui/toast'
 import { STATIC_SITE } from './source'
 
@@ -129,9 +130,14 @@ export function followLink(
     return
   }
   if (message.path === null) {
-    const tab = window.open(message.href, '_blank')
-    if (tab) tab.opener = null
-    else toast('Link to another site', message.href, 'info')
+    // The href comes from the frame, whose code anyone who can push wrote: only web and mail
+    // links open, since a `javascript:` one would run with the viewer's origin.
+    if (!isSafeHref(message.href) || !/^(https?|mailto):/i.test(message.href.trim())) {
+      toast('Link not opened', message.href.slice(0, 200), 'info')
+      return
+    }
+    const tab = window.open(message.href, '_blank', 'noopener,noreferrer')
+    if (!tab) toast('Link to another site', message.href, 'info')
     return
   }
   const frames = canvas.pages.flatMap((page) =>

@@ -122,20 +122,38 @@ export const staticSource: ViewerSource = {
   },
 }
 
-/** `url` against a unit's base; an empty base leaves it as the doc has it. */
+/**
+ * `url` against a unit's base, or '' when it may not be loaded. Docs come from builds anyone who
+ * can push has written, so a URL is only kept when it is http(s) and, for a unit build, inside
+ * that unit's base: a `javascript:` frame source would run with the viewer's own origin.
+ */
 export function resolveUrl(url: string, base: string): string {
-  if (!base) return url
   try {
-    const root = new URL(base.endsWith('/') ? base : `${base}/`, document.baseURI)
-    return new URL(url, root).href
+    const page = typeof document === 'undefined' ? 'http://localhost/' : document.baseURI
+    if (!base) {
+      const own = new URL(url, page)
+      return own.protocol === 'http:' || own.protocol === 'https:' ? url : ''
+    }
+    const root = new URL(base.endsWith('/') ? base : `${base}/`, page)
+    const resolved = new URL(url, root)
+    return resolved.origin === root.origin && resolved.href.startsWith(root.href) ? resolved.href : ''
   } catch {
-    return url
+    return ''
   }
 }
 
-/** A canvas with its frame, snapshot and image URLs resolved against its unit's base. */
+/** An external page for a `url` item: http or https only. */
+export function externalUrl(url: string): string {
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.href : ''
+  } catch {
+    return ''
+  }
+}
+
+/** A canvas with its frame, snapshot and image URLs resolved against its unit's base, unsafe ones dropped. */
 export function resolveCanvas(doc: CanvasDoc, base: string): CanvasDoc {
-  if (!base) return doc
   const at = (url: string) => resolveUrl(url, base)
   return {
     ...doc,
@@ -146,10 +164,24 @@ export function resolveCanvas(doc: CanvasDoc, base: string): CanvasDoc {
         items: section.items.map((item) => {
           if (item.kind === 'screen') {
             const each = (set?: Partial<Record<string, string>>) =>
-              set ? Object.fromEntries(Object.entries(set).map(([theme, url]) => [theme, url && at(url)])) : undefined
-            return { ...item, url: at(item.url), snapshots: each(item.snapshots), thumbs: each(item.thumbs) }
+              set
+                ? Object.fromEntries(
+                    Object.entries(set)
+                      .map(([theme, url]) => [theme, url && at(url)])
+                      .filter(([, url]) => url),
+                  )
+                : undefined
+            const url = at(item.url)
+            return {
+              ...item,
+              url,
+              missing: item.missing || !url,
+              snapshots: each(item.snapshots),
+              thumbs: each(item.thumbs),
+            }
           }
           if (item.kind === 'image') return { ...item, url: at(item.url) }
+          if (item.kind === 'url') return { ...item, url: externalUrl(item.url) }
           return item
         }),
       })),
@@ -159,7 +191,6 @@ export function resolveCanvas(doc: CanvasDoc, base: string): CanvasDoc {
 
 /** A design system with its specimen and asset URLs resolved against the system unit's base. */
 export function resolveSystem(doc: SystemDoc, base: string): SystemDoc {
-  if (!base) return doc
   const at = (url: string) => resolveUrl(url, base)
   return {
     ...doc,

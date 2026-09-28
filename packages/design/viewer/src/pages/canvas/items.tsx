@@ -76,7 +76,7 @@ export const FrameItem = memo(function FrameItem({
   const src = item.kind === 'screen' ? frameSrc(item.url, openTheme, capture ? { capture: '1' } : undefined) : item.url
   const ready = !!status?.ready
   const off = mode === 'off'
-  const mounted = !off && !(item.kind === 'screen' && item.missing)
+  const mounted = !off && !(item.kind === 'screen' && item.missing) && !!item.url
 
   useEffect(() => {
     if (off) setFrame(store, item.id, { ready: false })
