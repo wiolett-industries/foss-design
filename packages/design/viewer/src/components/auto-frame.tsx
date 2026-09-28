@@ -2,6 +2,7 @@ import type { Theme } from '@shared/types'
 import { useEffect, useRef, useState } from 'react'
 import { cn } from '../lib/cn'
 import { frameSrc, listenToFrame, scrollAround, sendTheme } from '../lib/frames'
+import { withError } from '../lib/messages'
 import { useViewer } from '../lib/viewer'
 import { Icon } from '../ui/icon'
 
@@ -25,7 +26,7 @@ export function AutoFrame({
   className?: string
 }) {
   const ref = useRef<HTMLIFrameElement>(null)
-  const { frameSandbox } = useViewer()
+  const { frameSandbox, frameAllow } = useViewer()
   const [initial] = useState(() => ({ src, theme }))
   const url = frameSrc(src, initial.src === src ? initial.theme : theme)
   const [height, setHeight] = useState(minHeight)
@@ -41,8 +42,7 @@ export function AutoFrame({
     return listenToFrame(frame, (message) => {
       if (message.type === 'size') setHeight(Math.max(minHeight, message.height))
       else if (message.type === 'ready') setReady(true)
-      else if (message.type === 'error')
-        setErrors((list) => (list.includes(message.message) ? list : [...list, message.message]))
+      else if (message.type === 'error') setErrors((list) => withError(list, message.message))
       else if (message.type === 'updated') setErrors([])
       else if (message.type === 'wheel' && !message.zoom) scrollAround(frame, message)
     })
@@ -65,6 +65,7 @@ export function AutoFrame({
         key={url}
         src={url}
         title={title}
+        allow={frameAllow}
         sandbox={frameSandbox}
         className={cn('block w-full border-0 transition-opacity duration-150', ready ? 'opacity-100' : 'opacity-0')}
         style={{ height, colorScheme: theme }}

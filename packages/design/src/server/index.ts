@@ -12,6 +12,7 @@ import type { Theme } from '../shared/types'
 import { handleApi, sendJson } from './api'
 import { Entries, HTML_BOOT } from './entries'
 import { EventHub } from './events'
+import { FRAME_HOST, isAllowedHost, isFrameApi, parseHost, VIEWER_HOST } from './hosts'
 import { type FrameHead, injectIntoHtml, moduleShell, optsOutOfSystem } from './html'
 import { linkShippedPackages } from './links'
 import { SnapshotStore } from './snapshots'
@@ -84,6 +85,7 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
   const links = linkShippedPackages(paths, project.appDir())
   const events = new EventHub()
   const httpServer = http.createServer()
+  const listening = () => (httpServer.address() as { port: number } | null)?.port ?? 0
 
   dropStaleDepCache(paths, project.appDir())
   const base = baseConfig(project)
@@ -129,7 +131,13 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
   const viewer = fs.existsSync(PKG.viewer) ? sirv(PKG.viewer, { dev: true, etag: true }) : null
   const viewerIndex = path.join(PKG.viewer, 'index.html')
   // The viewer is built with relative asset URLs; a base keeps them right on nested routes like /c/x/p/y.
-  const serveViewerIndex = (res: ServerResponse) => {
+  const serveViewerIndex = (req: IncomingMessage, res: ServerResponse, url: URL) => {
+    // The frames' host serves no viewer: a viewer there would put its frames on the viewer's own host.
+    if (parseHost(req.headers.host)?.name === FRAME_HOST) {
+      res.writeHead(302, { location: `http://${VIEWER_HOST}:${listening()}${url.pathname}${url.search}` })
+      res.end()
+      return
+    }
     const html = fs.readFileSync(viewerIndex, 'utf8').replace(/<head>/i, '<head>\n<base href="/">')
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' })
     res.end(html)
@@ -205,8 +213,16 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
       if (res.headersSent) return res.end()
       sendJson(res, 500, { error: (error as Error)?.stack ?? String(error) })
     }
+    if (!isAllowedHost(req.headers.host, listening(), options.host)) {
+      sendJson(res, 403, { error: `This preview server answers on localhost:${listening()} only.` })
+      return
+    }
     try {
       if (url.pathname.startsWith('/api/')) {
+        if (parseHost(req.headers.host)?.name === FRAME_HOST && !isFrameApi(url.pathname, req.method ?? 'GET')) {
+          sendJson(res, 403, { error: `Frames' host: open the viewer on http://${VIEWER_HOST}:${listening()}.` })
+          return
+        }
         handleApi(ctx, req, res, url)
           .then((handled) => {
             if (!handled) sendJson(res, 404, { error: 'unknown endpoint' })
@@ -239,9 +255,9 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
           if (servePublic && rel !== null && project.isPublicFile(rel))
             servePublic(req, res, () => notFoundPage(res, 'Not found', url.pathname))
           else if (path.extname(url.pathname)) notFoundPage(res, 'Not found', url.pathname)
-          else serveViewerIndex(res)
+          else serveViewerIndex(req, res, url)
         }
-        if (url.pathname === '/' || url.pathname === '/index.html') serveViewerIndex(res)
+        if (url.pathname === '/' || url.pathname === '/index.html') serveViewerIndex(req, res, url)
         else viewer(req, res, notViewer)
       } else notFoundPage(res, 'Viewer is not built', 'Run `pnpm build` in the foss-design package.')
     } catch (error) {

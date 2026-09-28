@@ -2,8 +2,9 @@ import fs from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import path from 'node:path'
 import { iconProblem, MAX_ICON_BYTES, writeIcon } from '../core/icon'
-import { isInside, packageVersion } from '../core/paths'
+import { packageVersion } from '../core/paths'
 import type { DesignProject } from '../core/project'
+import { isShowableSource } from '../core/system'
 import type { Theme } from '../shared/types'
 import type { EventHub } from './events'
 import { depsHash, type SnapshotStore, sourceHash } from './snapshots'
@@ -72,9 +73,14 @@ export async function handleApi(
     return true
   }
   if (route === '/source') {
+    // Only what the style guide shows, as a static build's sources.json holds: a component's
+    // specimen and sources. Frames reach this server too, and `.env` or `.git` are no one's business.
     const rel = url.searchParams.get('path') ?? ''
     const file = path.resolve(project.paths.root, rel)
-    if (!rel || !isInside(project.paths.root, file) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
+    const listed = project
+      .system()
+      ?.doc.components.some((component) => component.specimen === rel || component.sources.includes(rel))
+    if (!rel || !listed || !isShowableSource(project.paths, file)) {
       sendJson(res, 404, { error: 'not found' })
       return true
     }

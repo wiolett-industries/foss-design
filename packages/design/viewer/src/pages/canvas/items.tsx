@@ -3,6 +3,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 
 import { Markdown } from '../../components/markdown'
 import { cn } from '../../lib/cn'
 import { claimWheel, frameSrc, listenToFrame, sendTheme } from '../../lib/frames'
+import { withError } from '../../lib/messages'
 import { useStore } from '../../lib/store'
 import { useViewer } from '../../lib/viewer'
 import { Icon } from '../../ui/icon'
@@ -57,7 +58,7 @@ export const FrameItem = memo(function FrameItem({
 }) {
   const { item, x, y, w, h } = placed
   const ref = useRef<HTMLIFrameElement | null>(null)
-  const { frameSandbox } = useViewer()
+  const { frameSandbox, frameAllow } = useViewer()
   const setRef = useCallback(
     (el: HTMLIFrameElement | null) => {
       ref.current = el
@@ -97,7 +98,8 @@ export const FrameItem = memo(function FrameItem({
           break
         case 'error': {
           const current = store.get().frames[item.id]?.errors ?? []
-          if (!current.includes(message.message)) setFrame(store, item.id, { errors: [...current, message.message] })
+          const errors = withError(current, message.message)
+          if (errors !== current) setFrame(store, item.id, { errors })
           break
         }
         case 'updated':
@@ -155,7 +157,7 @@ export const FrameItem = memo(function FrameItem({
             key={rev}
             src={src}
             title={item.title}
-            allow="clipboard-read; clipboard-write; fullscreen"
+            allow={frameAllow}
             sandbox={frameSandbox}
             className={cn(
               'absolute top-0 left-0 block border-0 transition-opacity duration-200',

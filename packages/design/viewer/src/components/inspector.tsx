@@ -25,8 +25,8 @@ export function useInspection(frames: HTMLIFrameElement[], enabled: boolean, opt
   const project = useProject().data
   const tokens = useSystem(!!project?.system).data?.tokens as Token[] | undefined
   const [selected, setSelected] = useState<Selection | null>(null)
-  const state = useRef({ enabled, tokens })
-  state.current = { enabled, tokens }
+  const state = useRef({ enabled, tokens, picked: null as HTMLIFrameElement | null })
+  state.current = { enabled, tokens, picked: selected?.frame ?? null }
   const onEscape = useRef(options.onEscape)
   onEscape.current = options.onEscape
   const framesRef = useRef(frames)
@@ -57,7 +57,8 @@ export function useInspection(frames: HTMLIFrameElement[], enabled: boolean, opt
           if (state.current.enabled) tell(frame, true)
           else told.current.set(frame, { on: false })
         } else if (message.type === 'inspect') {
-          if (message.info) {
+          // A pick comes from a frame asked to inspect; after that, the frame holding it refreshes it.
+          if (message.info && (state.current.enabled || state.current.picked === frame)) {
             // One pick across all frames: clear the others.
             for (const other of framesRef.current)
               if (other !== frame) sendToFrame(other, { type: 'inspect-select', ref: null })

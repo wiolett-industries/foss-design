@@ -56,10 +56,15 @@ export function viewerKeys(id: string) {
 
 export type ViewerKeys = ReturnType<typeof viewerKeys>
 
+/** What frames of the local viewer may use: the clipboard, both ways, and fullscreen. */
+export const DEFAULT_FRAME_ALLOW = 'clipboard-read; clipboard-write; fullscreen'
+
 export interface Viewer {
   source: ViewerSource
   keys: ViewerKeys
   frameSandbox?: string
+  /** The `allow` attribute (permissions policy) of every frame. */
+  frameAllow: string
   slots: ViewerSlots
   scope: ViewerScope | null
 }

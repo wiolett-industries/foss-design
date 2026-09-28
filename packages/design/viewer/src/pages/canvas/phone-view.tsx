@@ -15,6 +15,7 @@ import { Mark } from '../../components/wordmark'
 import { useCanvas } from '../../lib/api'
 import { cn } from '../../lib/cn'
 import { followLink, frameSrc, listenToFrame, reloadFrame, sendTheme } from '../../lib/frames'
+import { withError } from '../../lib/messages'
 import { setThemePref, useTheme } from '../../lib/theme'
 import { useViewer } from '../../lib/viewer'
 import { IconButton } from '../../ui/button'
@@ -42,7 +43,7 @@ export function PhoneCanvas({ canvasId, pageId, itemId }: { canvasId: string; pa
 
 function PhoneViewer({ canvas, pageId, itemId }: { canvas: CanvasDoc; pageId?: string; itemId?: string }) {
   const [, navigate] = useLocation()
-  const { frameSandbox, slots, scope } = useViewer()
+  const { frameSandbox, frameAllow, slots, scope } = useViewer()
   const appTheme = useTheme()
   const all = useMemo(() => framesOf(canvas, null), [canvas])
   const index = Math.max(
@@ -111,8 +112,7 @@ function PhoneViewer({ canvas, pageId, itemId }: { canvas: CanvasDoc; pageId?: s
     if (!el || item?.kind !== 'screen') return
     return listenToFrame(el, (message: RuntimeMessage) => {
       if (message.type === 'size') setAutoHeight(message.height)
-      else if (message.type === 'error')
-        setErrors((list) => (list.includes(message.message) ? list : [...list, message.message]))
+      else if (message.type === 'error') setErrors((list) => withError(list, message.message))
       else if (message.type === 'updated') setErrors([])
       else if (message.type === 'go')
         goTo(message.target.includes('/') ? message.target.split('/')[1]! : message.target)
@@ -252,7 +252,7 @@ function PhoneViewer({ canvas, pageId, itemId }: { canvas: CanvasDoc; pageId?: s
                   key={`${item.id}:${item.kind === 'screen' ? item.rev : item.url}`}
                   src={src}
                   title={item.title}
-                  allow="clipboard-read; clipboard-write; fullscreen"
+                  allow={frameAllow}
                   sandbox={frameSandbox}
                   className="block border-0"
                   style={{

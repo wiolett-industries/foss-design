@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import type { AssetDoc, ComponentDoc, GuidelineDoc, Issue, SystemDoc, SystemSummary } from '../shared/types'
-import { type DesignPaths, relToDesign, relToRoot } from './paths'
+import { DESIGN_DIR, type DesignPaths, isInside, relToDesign, relToRoot } from './paths'
 import { describeZodError, type SystemConfig, SystemConfigSchema } from './schema'
 import type { ScreenSource, UrlScheme } from './sources'
 import { firstHeading, parseDocTags, parseFrontmatter, slugify, titleize } from './text'
@@ -24,6 +24,22 @@ const SPECIMEN_EXT = new Set(['.tsx', '.jsx', '.html'])
 const COMPONENT_EXT = ['.tsx', '.jsx', '.ts', '.js', '.vue', '.svelte', '.html']
 const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.avif', '.svg', '.ico'])
 const FONT_EXT = new Set(['.woff', '.woff2', '.ttf', '.otf'])
+
+/**
+ * A file the style guide may show as a component's code, and a build may upload: inside the
+ * project and not behind a link out of it, with no dot-file or dot-folder on the way (`.env`,
+ * `.git`) other than `.design`. A specimen's `@source` comes from whoever wrote it.
+ */
+export function isShowableSource(paths: DesignPaths, file: string): boolean {
+  if (!isInside(paths.root, file)) return false
+  const parts = path.relative(paths.root, file).split(path.sep)
+  if (parts.some((part, index) => part.startsWith('.') && !(index === 0 && part === DESIGN_DIR))) return false
+  try {
+    return fs.statSync(file).isFile() && isInside(fs.realpathSync(paths.root), fs.realpathSync(file))
+  } catch {
+    return false
+  }
+}
 
 function listFiles(dir: string, deep = false): string[] {
   if (!fs.existsSync(dir)) return []
@@ -111,8 +127,14 @@ export function loadSystem(paths: DesignPaths, urls: UrlScheme): ResolvedSystem 
       .map((value) => path.resolve(path.dirname(file), value))
     for (const source of sources) {
       if (!fs.existsSync(source)) report('warning', file, `@source not found: ${path.relative(paths.system, source)}`)
+      else if (!isShowableSource(paths, source))
+        report(
+          'warning',
+          file,
+          `@source not shown (outside the project, or a dot-file): ${path.relative(paths.system, source)}`,
+        )
     }
-    const found = sources.filter((source) => fs.existsSync(source))
+    const found = sources.filter((source) => isShowableSource(paths, source))
     const title = tags.title?.[0] || titleize(stem)
     const format = ext === '.html' ? 'html' : 'module'
     components.push({
@@ -122,7 +144,9 @@ export function loadSystem(paths: DesignPaths, urls: UrlScheme): ResolvedSystem 
       description: tags.description?.[0] || undefined,
       status: tags.status?.[0] || undefined,
       specimen: relToRoot(paths, file),
-      sources: (found.length ? found : guessSources(componentsDir, stem)).map((source) => relToRoot(paths, source)),
+      sources: (found.length ? found : guessSources(componentsDir, stem))
+        .filter((source) => isShowableSource(paths, source))
+        .map((source) => relToRoot(paths, source)),
       url:
         format === 'module' ? urls.screen(SYSTEM_CANVAS, id) : urls.html(relToDesign(paths, file), SYSTEM_CANVAS, id),
     })

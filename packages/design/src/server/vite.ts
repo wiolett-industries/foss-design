@@ -7,6 +7,7 @@ import type { Alias, InlineConfig } from 'vite'
 import { type DesignPaths, PKG } from '../core/paths'
 import type { DesignProject } from '../core/project'
 import { toPosix } from '../core/text'
+import { designCodeGuard } from './css-guard'
 
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
@@ -70,6 +71,11 @@ export function baseConfig(project: DesignProject): InlineConfig {
       // One React for screens, the runtime and project components: resolved from `.design`.
       dedupe: ['react', 'react-dom'],
     },
-    plugins: [react(), tailwindcss()],
+    // No PostCSS config is looked up (Vite would search from `.design` upward and load it in Node):
+    // screens get Tailwind from the plugin, and the app's own config is for the app's build.
+    css: { postcss: {} },
+    // Pulled code runs in the browser only: the guard refuses stylesheets that would load code from
+    // `.design` in Node (Tailwind's `@plugin` and `@config`), before Tailwind reads them.
+    plugins: [react(), designCodeGuard(paths.design), tailwindcss()],
   }
 }

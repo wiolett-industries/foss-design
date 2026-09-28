@@ -2,6 +2,7 @@ import { compileRoute, linkPath, matchRoute } from '@shared/routes'
 import type { CanvasDoc, RuntimeMessage, Theme, ViewerMessage } from '@shared/types'
 import { isSafeHref } from '../components/markdown'
 import { toast } from '../ui/toast'
+import { readRuntimeMessage } from './messages'
 import { STATIC_SITE } from './source'
 
 type Handler = (message: RuntimeMessage) => void
@@ -10,9 +11,12 @@ type Handler = (message: RuntimeMessage) => void
 const handlers = new Map<Window, Set<Handler>>()
 
 window.addEventListener('message', (event: MessageEvent) => {
-  const data = event.data as RuntimeMessage | null
-  if (data?.source !== 'design-runtime' || !event.source) return
-  for (const handler of handlers.get(event.source as Window) ?? []) handler(data)
+  const listeners = event.source ? handlers.get(event.source as Window) : undefined
+  if (!listeners) return
+  // Frames run code anyone who can push wrote: a message of the wrong shape goes nowhere.
+  const message = readRuntimeMessage(event.data)
+  if (!message) return
+  for (const handler of listeners) handler(message)
 })
 
 export function listenToFrame(frame: HTMLIFrameElement, handler: Handler): () => void {
@@ -89,7 +93,8 @@ export function reloadFrame(frame: HTMLIFrameElement | null) {
  * process, so frames served from the viewer's twin host (localhost ↔ 127.0.0.1,
  * both reach the same server) run their scripts and animations off the viewer's
  * thread: a canvas full of live screens still pans smoothly. Any other host,
- * and static builds, keep frames on the viewer's origin.
+ * and static builds, keep frames on the viewer's origin. The dev server keeps
+ * its viewer on localhost and gives 127.0.0.1 to frames (server/hosts.ts).
  */
 export const FRAME_ORIGIN = (() => {
   if (STATIC_SITE) return ''

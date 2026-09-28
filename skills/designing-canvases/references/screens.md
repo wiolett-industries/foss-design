@@ -77,6 +77,8 @@ If `system.json` names a custom `stylesheet`, that stylesheet replaces the defau
 
 With `"system": false` nothing is injected: import your own CSS from the screen (`import './checkout.css'`) or style inline.
 
+Code under `.design` runs in the browser only, since `design pull` brings in what teammates wrote. A stylesheet that would load code from `.design` in Node is refused with an error naming the file and the directive: Tailwind's `@plugin` and `@config` (and Less's `@plugin`, Stylus's `use()`) may name an installed package (`@plugin "@tailwindcss/typography"`) or a file in the app's own source, not a file in `.design`. No PostCSS config is loaded for screens either; Tailwind comes from foss-design itself.
+
 ## Theme
 
 The viewer sets `data-theme="light"` or `data-theme="dark"` and the `dark` class on `<html>`, and `color-scheme` to match, before the first paint. Token values switch through `:root[data-theme="dark"]` in `tokens.css`; `dark:` utilities work as expected. `useTheme()` returns the current theme for the rare case a component needs it in JavaScript. Pin a screen's theme with `"theme"` in `canvas.json`.

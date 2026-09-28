@@ -162,7 +162,9 @@ export async function runPublish(paths: DesignPaths, value: string | undefined, 
       return print(dim(`${canvas}/${screen} has no public link`))
     const { publicId } = await client.screenAction(link.project, canvas, screen, verb)
     if (publish) {
-      print(`${green('✓')} Published ${bold(`${canvas}/${screen}`)} on its own: anyone with the link sees this screen alone`)
+      print(
+        `${green('✓')} Published ${bold(`${canvas}/${screen}`)} on its own: anyone with the link sees this screen alone`,
+      )
       if (publicId) print(`  ${cyan(screenUrl(link.host, publicId))}`)
     } else print(`${green('✓')} ${bold(`${canvas}/${screen}`)} has no public link now`)
     return

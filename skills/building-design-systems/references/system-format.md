@@ -140,6 +140,7 @@ Page defaults belong in `tokens.css` too, so every screen starts right:
 - `@import "tailwindcss"`: already imported before `tokens.css`.
 - `@custom-variant dark`: already bound to `[data-theme="dark"]`.
 - `@source`: every file in `.design` is scanned; add project folders through `sources` in `.design/design.json`.
+- `@plugin` or `@config` naming a file in `.design`: refused, since Tailwind would run it in Node and `design pull` may have brought it. Name an installed package or a file in the app's own source.
 
 ## Fonts
 
@@ -222,7 +223,7 @@ export default function ButtonSpecimen() {
 | `@group` | Sidebar group (Actions, Inputs, Navigation, Feedback, Data display…). Default `Components`. |
 | `@description` | Usage guidance; runs over several lines until the next tag. |
 | `@status` | Free text shown as a badge (`stable`, `beta`, `deprecated`). |
-| `@source` | Component source shown on the Code tab, relative to the specimen; repeat the tag or separate paths with spaces or commas. Without it, a file in `components/` with the same name (or a folder of that name) is used. |
+| `@source` | Component source shown on the Code tab, relative to the specimen; repeat the tag or separate paths with spaces or commas. Without it, a file in `components/` with the same name (or a folder of that name) is used. Only files inside the project show (and go into builds): a path out of it, or through a dot-file or dot-folder such as `.env` or `.git`, is left out with a warning. |
 
 HTML specimens put the same tags in a leading `<!-- … -->` comment.
 

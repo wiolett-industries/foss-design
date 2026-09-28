@@ -7,6 +7,7 @@ import { ThemeMenu } from '../../components/theme-menu'
 import { Bar } from '../../components/topbar'
 import { useCanvas } from '../../lib/api'
 import { followLink, frameSrc, listenToFrame, reloadFrame, sendTheme } from '../../lib/frames'
+import { withError } from '../../lib/messages'
 import { useTheme } from '../../lib/theme'
 import { useViewer } from '../../lib/viewer'
 import { IconButton } from '../../ui/button'
@@ -54,7 +55,7 @@ export function PlayPage({ canvasId, itemId }: { canvasId: string; itemId: strin
 
 function Player({ canvas, itemId }: { canvas: CanvasDoc; itemId: string }) {
   const [, navigate] = useLocation()
-  const { frameSandbox, slots } = useViewer()
+  const { frameSandbox, frameAllow, slots } = useViewer()
   const pageParam =
     new URLSearchParams(window.location.search).get('page') ??
     (window.location.hash.split('?')[1] ? new URLSearchParams(window.location.hash.split('?')[1]).get('page') : null)
@@ -133,8 +134,7 @@ function Player({ canvas, itemId }: { canvas: CanvasDoc; itemId: string }) {
     if (!el || item?.kind !== 'screen') return
     setErrors([])
     return listenToFrame(el, (message: RuntimeMessage) => {
-      if (message.type === 'error')
-        setErrors((list) => (list.includes(message.message) ? list : [...list, message.message]))
+      if (message.type === 'error') setErrors((list) => withError(list, message.message))
       else if (message.type === 'updated') setErrors([])
       else if (message.type === 'keydown' && message.code === 'Escape') navigate(back)
       else if (message.type === 'go') {
@@ -273,7 +273,7 @@ function Player({ canvas, itemId }: { canvas: CanvasDoc; itemId: string }) {
                 key={`${item.id}:${item.kind === 'screen' ? item.rev : item.url}`}
                 src={src}
                 title={item.title}
-                allow="clipboard-read; clipboard-write; fullscreen"
+                allow={frameAllow}
                 sandbox={frameSandbox}
                 className="block border-0"
                 style={{ width, height, transform: `scale(${scale})`, transformOrigin: '0 0', colorScheme: frameTheme }}

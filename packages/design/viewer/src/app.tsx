@@ -3,11 +3,13 @@ import { MotionConfig } from 'motion/react'
 import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { Redirect, Route, Router, Switch } from 'wouter'
 import { CommandPalette } from './components/command-palette'
+import { PageBoundary } from './components/error-boundary'
 import { AppTopBar } from './components/topbar'
 import { connectEvents, createQueryClient, useProject } from './lib/api'
 import { useIsPhone } from './lib/phone'
 import type { ViewerSource } from './lib/source'
 import {
+  DEFAULT_FRAME_ALLOW,
   sameId,
   sourceId,
   type Viewer,
@@ -112,6 +114,13 @@ export interface DesignViewerProps {
   base?: string
   /** The `sandbox` attribute for every frame; none when unset. */
   frameSandbox?: string
+  /**
+   * The `allow` attribute (permissions policy) for every frame; `clipboard-read; clipboard-write;
+   * fullscreen` when unset, as the local viewer has it. A permission the user grants is the
+   * embedding page's and then holds for every frame, so a host that shows screens from others
+   * should grant less, such as `clipboard-write` alone.
+   */
+  frameAllow?: string
   slots?: ViewerSlots
   scope?: ViewerScope
   /** Shared with the embedding app; the viewer makes its own when unset. */
@@ -119,7 +128,15 @@ export interface DesignViewerProps {
 }
 
 /** The whole viewer: home, canvases, screens and the design system of one project. */
-export function DesignViewer({ source, base = '', frameSandbox, slots, scope, queryClient }: DesignViewerProps) {
+export function DesignViewer({
+  source,
+  base = '',
+  frameSandbox,
+  frameAllow = DEFAULT_FRAME_ALLOW,
+  slots,
+  scope,
+  queryClient,
+}: DesignViewerProps) {
   const [ownClient] = useState(() => queryClient ?? createQueryClient(source.live))
   const client = queryClient ?? ownClient
   const keys = useMemo(() => viewerKeys(sourceId(source)), [source])
@@ -129,10 +146,11 @@ export function DesignViewer({ source, base = '', frameSandbox, slots, scope, qu
       source,
       keys,
       frameSandbox,
+      frameAllow,
       slots: slots ?? {},
       scope: scopeCanvas === undefined ? null : { canvas: scopeCanvas },
     }),
-    [source, keys, frameSandbox, slots, scopeCanvas],
+    [source, keys, frameSandbox, frameAllow, slots, scopeCanvas],
   )
 
   useEffect(() => (source.live ? connectEvents(client, keys) : undefined), [source, client, keys])
@@ -144,7 +162,7 @@ export function DesignViewer({ source, base = '', frameSandbox, slots, scope, qu
           <TooltipProvider>
             <Title />
             <Router base={base}>
-              {viewer.scope ? <ScopedRoutes canvas={viewer.scope.canvas} /> : <Routes />}
+              <PageBoundary>{viewer.scope ? <ScopedRoutes canvas={viewer.scope.canvas} /> : <Routes />}</PageBoundary>
               <CommandPalette />
             </Router>
             <Toaster />

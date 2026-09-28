@@ -33,7 +33,7 @@ export function useOpenUrl(canvasId: string, item: Frame | undefined, theme: The
 export function FullPage({ canvasId, itemId }: { canvasId: string; itemId: string }) {
   const { data: canvas, error, isLoading } = useCanvas(canvasId)
   const [, navigate] = useLocation()
-  const { frameSandbox, slots } = useViewer()
+  const { frameSandbox, frameAllow, slots } = useViewer()
   const appTheme = useTheme()
   const frame = useRef<HTMLIFrameElement | null>(null)
   const [frameEl, setFrameEl] = useState<HTMLIFrameElement | null>(null)
@@ -94,7 +94,7 @@ export function FullPage({ canvasId, itemId }: { canvasId: string; itemId: strin
         key={`${item.id}:${item.kind === 'screen' ? item.rev : item.url}`}
         src={url}
         title={item.title}
-        allow="clipboard-read; clipboard-write; fullscreen"
+        allow={frameAllow}
         sandbox={frameSandbox}
         className="block h-full w-full border-0"
         style={{ colorScheme: theme }}
