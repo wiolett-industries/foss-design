@@ -10,6 +10,8 @@ export interface PlacedSection extends Rect {
   section: CanvasSection
   /** Height of the title/description block above the row. */
   header: number
+  /** How far below the section's top its first row starts. */
+  body: number
 }
 
 export interface Layout {
@@ -97,6 +99,7 @@ export function layoutPage(page: CanvasPage, sizes: Sizes): Layout {
         w: Math.max(width, header ? HEADER_MIN_WIDTH : 0),
         h: bottom - top,
         header,
+        body: header ? header + HEADER_GAP : 0,
       })
       y = bottom + SECTION_GAP
     }

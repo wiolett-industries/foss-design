@@ -42,12 +42,15 @@ const Label = memo(function Label({ placed, store }: { placed: Placed; store: Vi
   )
 })
 
-/** A section's title in screen space, for zooms where the one on the canvas is too small to read. */
+/**
+ * A section's title in screen space, for zooms where the one on the canvas is too small to read: where
+ * that one was, lifted only as far as it must be to clear the frame labels under it.
+ */
 const SectionTitle = memo(function SectionTitle({ placed }: { placed: PlacedSection }) {
   return (
     <div
       data-at=""
-      style={{ '--x': placed.x, '--y': placed.y } as CSSProperties}
+      style={{ '--x': placed.x, '--y': placed.y, '--body': placed.body } as CSSProperties}
       className="section-title text-[15px] leading-none font-semibold whitespace-nowrap text-ink select-none"
     >
       {placed.section.title}

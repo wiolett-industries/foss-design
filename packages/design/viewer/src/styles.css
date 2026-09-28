@@ -476,11 +476,13 @@
   visibility: hidden;
 }
 
-/* Section titles in screen space, in the gap above the section (the header below it is only a few
-   pixels tall by then): shown only while the canvas ones are too small (data-titles). */
+/* Section titles in screen space, shown only while the canvas ones are too small (data-titles). Each
+   sits where the canvas one was, so none jumps as they swap; as the zoom falls and the frame labels
+   (about 19px) come up under it, it lifts into the gap above the section, 23px at most (its own
+   height with the padding): 44px is the title, a 10px space and a label. */
 .canvas-overlay .section-title {
   display: none;
-  translate: 0 -100%;
+  translate: 0 max(-100%, min(0px, calc(var(--body) * var(--z) * 1px - 44px)));
   padding-bottom: 8px;
 }
 
