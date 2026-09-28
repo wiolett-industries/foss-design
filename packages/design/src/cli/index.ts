@@ -88,12 +88,15 @@ ${bold('Cloud')}  ${dim('units: system (design.json + system/) and canvas/<id>; 
   merge [<unit|file>…] [--here|--cloud]      Conflicts a merge left: lists them (in a terminal, walks
         [--done] [--json]                    through them); --here / --cloud settles files or units;
                                              --done closes a merge once no markers are left
-  url <canvas> [--json]                      The canvas in the web app, and its public link if published
+  url <canvas> [--json]                      The canvas in the web app, and its public links: the canvas's
+                                             and its screens' published on their own
   history <canvas|system> [--json]           Stored revisions, newest first: when, who, screens, size
   rollback <canvas> <rev>                    Make an old revision current again in the cloud (a new
                                              revision), then pull it here
-  publish <canvas>                           Give the canvas a public link anyone can open (owner only)
-  unpublish <canvas>                         Turn the public link off
+  publish <canvas>[/<screen>]                Give the canvas a public link anyone can open (owner only);
+                                             with a screen, a link to that screen alone, which names
+                                             nothing of the project and opens no other screen
+  unpublish <canvas>[/<screen>]              Turn the public link off
   archive <canvas>                           Archive the canvas in the cloud: out of the list and pushes,
                                              history kept
   unarchive <canvas>                         Bring an archived canvas back

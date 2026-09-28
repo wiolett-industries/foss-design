@@ -1,6 +1,7 @@
 import type { RuntimeMessage, ScreenItem, Theme, UrlItem } from '@shared/types'
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useRouter } from 'wouter'
+import { CornerPlate } from '../../components/corner-plate'
 import { useCanvas } from '../../lib/api'
 import { absoluteUrl, followLink, frameSrc, listenToFrame, sendTheme } from '../../lib/frames'
 import { useTheme } from '../../lib/theme'
@@ -28,13 +29,18 @@ export function useOpenUrl(canvasId: string, item: Frame | undefined, theme: The
   return absoluteUrl(`${base}${fullHref(canvasId, item.id, item.theme ?? theme)}`)
 }
 
-/** `/c/:canvas/full/:item`: one screen filling the window, a way out on hover and Esc. */
+/** `/c/:canvas/full/:item`: one screen filling the window, a way out in the top-right corner and on Esc. */
 export function FullPage({ canvasId, itemId }: { canvasId: string; itemId: string }) {
   const { data: canvas, error, isLoading } = useCanvas(canvasId)
   const [, navigate] = useLocation()
-  const { frameSandbox } = useViewer()
+  const { frameSandbox, slots } = useViewer()
   const appTheme = useTheme()
-  const frame = useRef<HTMLIFrameElement>(null)
+  const frame = useRef<HTMLIFrameElement | null>(null)
+  const [frameEl, setFrameEl] = useState<HTMLIFrameElement | null>(null)
+  const setFrame = useCallback((el: HTMLIFrameElement | null) => {
+    frame.current = el
+    setFrameEl(el)
+  }, [])
   const param = new URLSearchParams(window.location.search).get('theme')
   const items: Frame[] = canvas
     ? canvas.pages.flatMap((page) =>
@@ -82,9 +88,9 @@ export function FullPage({ canvasId, itemId }: { canvasId: string; itemId: strin
   if (!item) return <NotFound title="Screen not found" text={`No screen "${itemId}" on this canvas.`} />
 
   return (
-    <div className="group fixed inset-0 bg-surface">
+    <div className="fixed inset-0 bg-surface">
       <iframe
-        ref={frame}
+        ref={setFrame}
         key={`${item.id}:${item.kind === 'screen' ? item.rev : item.url}`}
         src={url}
         title={item.title}
@@ -94,16 +100,17 @@ export function FullPage({ canvasId, itemId }: { canvasId: string; itemId: strin
         style={{ colorScheme: theme }}
         onLoad={() => item.kind === 'screen' && sendTheme(frame.current, theme)}
       />
-      <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-end p-3 opacity-0 transition-opacity duration-200 group-hover:opacity-100 focus-within:opacity-100">
+      <CornerPlate frame={frameEl} note={slots.fullPlate?.note} badge={slots.fullPlate?.badge}>
         <Link
           href={back}
-          className="pointer-events-auto flex h-8 items-center gap-2 rounded-[8px] border border-rule bg-surface px-3 text-[12.5px] text-ink2 no-underline shadow-pop hover:text-ink"
+          className="flex h-8 min-w-0 items-center gap-2 rounded-[6px] px-2 text-[12.5px] text-ink2 no-underline hover:bg-soft2 hover:text-ink"
         >
           <Icon name="x" size={14} />
-          Back to {canvas.title}
+          <span className="truncate">Back to {canvas.title}</span>
           <Kbd>esc</Kbd>
         </Link>
-      </div>
+        {slots.fullPlate?.actions}
+      </CornerPlate>
     </div>
   )
 }

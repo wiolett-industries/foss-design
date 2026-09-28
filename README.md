@@ -125,7 +125,7 @@ The complete formats are in the skills: [canvas.json](skills/designing-canvases/
 | `design url <canvas> [--json]` | The canvas in the web app, and its public link when published. |
 | `design history <canvas\|system> [--json]` | Stored revisions, newest first: when, who, screens, size. |
 | `design rollback <canvas> <rev>` | Make an old revision current again in the cloud (as a new revision), then pull it. |
-| `design publish <canvas>` / `design unpublish <canvas>` | Give the canvas a public link anyone can open, or turn it off (owner only). |
+| `design publish <canvas>[/<screen>]` / `design unpublish <canvas>[/<screen>]` | Give the canvas a public link anyone can open, or turn it off (owner only). With a screen, the link opens that screen alone: its address names nothing of the project, it loads only that screen's files, and links in it open only other screens published the same way. |
 | `design archive <canvas>` / `design unarchive <canvas>` | Archive a canvas in the cloud (out of the list and pushes, history kept), or bring it back. |
 
 `--root <dir>` points any command at a project; by default the nearest folder with `.design` is used. The viewer listens on a free port picked at start, so several projects can preview at once; `--port` or `"port"` in `design.json` pins one. It opens a browser only with `--open`.

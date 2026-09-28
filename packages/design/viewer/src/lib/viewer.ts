@@ -29,6 +29,12 @@ export interface ViewerSlots {
   canvasesAfter?: ReactNode
   /** Below the panels of the home page, full width. */
   homeAfter?: ReactNode
+  /**
+   * On a screen's full-window page, the corner plate with the way out: `note` is a muted line under it
+   * (whose content the screen is), `actions` sit next to the way out, and with `badge` the plate folds
+   * into that badge instead of fading out (pages anyone can open).
+   */
+  fullPlate?: { note?: ReactNode; actions?: ReactNode; badge?: ReactNode }
 }
 
 /** Single-canvas mode: only this canvas is reachable, without the design system or other canvases. */

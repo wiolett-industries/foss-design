@@ -336,6 +336,8 @@ let booted = false
 let hmrBound = false
 /** Set when the frame sits on the canvas: only then does the wheel belong to the viewer. */
 let canvasHost = false
+/** Set when the viewer asked where the pointer is (a full-window screen's corner controls). */
+let pointerHost = false
 
 /** Wire the frame to the viewer. `mount` calls it; HTML screens get it injected. */
 export function boot() {
@@ -354,6 +356,7 @@ export function boot() {
     const data = event.data as ViewerMessage | null
     if (data?.source !== 'design-viewer' || event.source !== window.parent) return
     if (data.type === 'canvas') canvasHost = true
+    else if (data.type === 'pointer') pointerHost = true
     else if (data.type === 'theme' && data.theme && !config.theme) {
       applyTheme(data.theme)
       scheduleSnapshot()
@@ -402,6 +405,32 @@ export function boot() {
   )
   window.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && !event.defaultPrevented) post({ type: 'keydown', code: 'Escape' })
+  })
+  // Moves go out at most once a frame; presses and leaving right away.
+  let moved: { x: number; y: number } | null = null
+  const pointer = (x: number, y: number, down: boolean) => {
+    if (!pointerHost || !embedded) return
+    if (down || x < 0) {
+      post({ type: 'pointer', x, y, down })
+      return
+    }
+    if (!moved)
+      requestAnimationFrame(() => {
+        if (moved) post({ type: 'pointer', x: moved.x, y: moved.y, down: false })
+        moved = null
+      })
+    moved = { x, y }
+  }
+  window.addEventListener('pointermove', (event) => pointer(event.clientX, event.clientY, false), {
+    capture: true,
+    passive: true,
+  })
+  window.addEventListener('pointerdown', (event) => pointer(event.clientX, event.clientY, true), true)
+  document.addEventListener('pointerout', (event) => {
+    if (!event.relatedTarget) {
+      moved = null
+      pointer(-1, -1, false)
+    }
   })
   // Holding ⌘/Ctrl inspects in the viewer, which cannot see keys pressed in here.
   const isModifier = (name: string) => name === 'Meta' || name === 'Control'

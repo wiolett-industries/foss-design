@@ -318,6 +318,11 @@ export type RuntimeMessage =
       zoom: boolean
     }
   | { source: 'design-runtime'; key: string; type: 'keydown'; code: string }
+  /**
+   * Where the pointer is in the frame, once the viewer asked with `pointer` (0.9.11+): on moves (at
+   * most once a frame), `down` on a press (a tap on a touch screen), -1, -1 when it leaves.
+   */
+  | { source: 'design-runtime'; key: string; type: 'pointer'; x: number; y: number; down: boolean }
   /** ⌘/Ctrl pressed or released in the frame, or a key pressed while one is down. */
   | { source: 'design-runtime'; key: string; type: 'key'; name: string; down: boolean }
   | { source: 'design-runtime'; key: string; type: 'blur' }
@@ -331,6 +336,8 @@ export type ViewerMessage =
   | { source: 'design-viewer'; type: 'theme'; theme: Theme }
   /** The frame is on the canvas: pan and zoom with the wheel go to the viewer. */
   | { source: 'design-viewer'; type: 'canvas' }
+  /** Report the pointer: the viewer shows its controls when the pointer nears them over the frame. */
+  | { source: 'design-viewer'; type: 'pointer' }
   /** Inspect mode on or off; `tokens` let the frame name the tokens behind computed styles. */
   | { source: 'design-viewer'; type: 'inspect'; on: boolean; tokens?: Token[] }
   /** Pick an element by the `ref` a previous report gave it, or clear the pick without reporting. */

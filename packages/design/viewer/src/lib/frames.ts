@@ -112,6 +112,12 @@ export function absoluteUrl(url: string): string {
   return new URL(url, document.baseURI).toString()
 }
 
+/** A screen a link can lead to: its id and the app routes it shows. */
+export interface LinkTarget {
+  id: string
+  routes?: string[]
+}
+
 /**
  * A link, form or history push the runtime kept from leaving its frame. The path goes to the
  * screen whose `route` matches it best (a relative `href` resolves against the route of the
@@ -121,9 +127,11 @@ export function absoluteUrl(url: string): string {
  */
 export function followLink(
   message: Extract<RuntimeMessage, { type: 'link' }>,
-  canvas: CanvasDoc,
+  canvas: CanvasDoc | LinkTarget[],
   go: (id: string) => void,
   from?: string,
+  /** A link to a path no screen has; a toast says so by default. */
+  missing?: (path: string) => void,
 ) {
   if (message.form) {
     toast('Forms are not sent from a screen', undefined, 'info')
@@ -140,9 +148,13 @@ export function followLink(
     if (!tab) toast('Link to another site', message.href, 'info')
     return
   }
-  const frames = canvas.pages.flatMap((page) =>
-    page.sections.flatMap((section) => section.items.filter((item) => item.kind === 'screen' || item.kind === 'url')),
-  )
+  const frames: LinkTarget[] = Array.isArray(canvas)
+    ? canvas
+    : canvas.pages.flatMap((page) =>
+        page.sections.flatMap((section) =>
+          section.items.filter((item) => item.kind === 'screen' || item.kind === 'url'),
+        ),
+      )
   const here = frames.find((item) => item.id === from)
   const path = message.raw === undefined ? message.path : linkPath(message.raw, here?.routes?.[0])
   if (path === null) return
@@ -160,5 +172,7 @@ export function followLink(
     name = decodeURIComponent(name)
   } catch {}
   if (name && name !== from && frames.some((item) => item.id === name)) go(name)
-  else if (!message.pushed) toast('No screen for this link', path, 'info')
+  else if (message.pushed) return
+  else if (missing) missing(path)
+  else toast('No screen for this link', path, 'info')
 }

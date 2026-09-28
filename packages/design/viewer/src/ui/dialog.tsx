@@ -1,6 +1,6 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { AnimatePresence, motion, useDragControls } from 'motion/react'
-import type { ReactNode, SyntheticEvent } from 'react'
+import { type ReactNode, type SyntheticEvent, useLayoutEffect, useRef, useState } from 'react'
 import { cn } from '../lib/cn'
 import { useIsPhone } from '../lib/phone'
 import { IconButton } from './button'
@@ -22,6 +22,7 @@ export function Dialog({
   footNote,
   below,
   width = 440,
+  step,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -36,6 +37,11 @@ export function Dialog({
   /** Full-width content under the body, scrolling on its own: lists with row borders. */
   below?: ReactNode
   width?: number
+  /**
+   * The dialog's current step, for a dialog that turns into another one in place (a confirmation
+   * that becomes its result): a new value cross-fades the content while the panel eases to its size.
+   */
+  step?: string
 }) {
   const phone = useIsPhone()
   const drag = useDragControls()
@@ -117,11 +123,13 @@ export function Dialog({
                   </div>
                   {head}
                 </div>
-                <div className="min-h-0 overflow-y-auto overscroll-contain">
-                  {body}
-                  {list}
-                </div>
-                {foot}
+                <Step step={step} className="flex min-h-0 flex-col">
+                  <div className="min-h-0 overflow-y-auto overscroll-contain">
+                    {body}
+                    {list}
+                  </div>
+                  {foot}
+                </Step>
               </motion.div>
             </DialogPrimitive.Content>
           </DialogPrimitive.Portal>
@@ -145,10 +153,14 @@ export function Dialog({
                     className={cn(floatingSurface, 'my-auto flex max-w-full flex-col outline-none')}
                     style={{ width }}
                   >
-                    {head}
-                    {body}
-                    {list}
-                    {foot}
+                    <Resizing>
+                      <Step step={step}>
+                        {head}
+                        {body}
+                        {list}
+                        {foot}
+                      </Step>
+                    </Resizing>
                   </motion.div>
                 </DialogPrimitive.Content>
               </motion.div>
@@ -157,5 +169,47 @@ export function Dialog({
         ) : null}
       </AnimatePresence>
     </DialogPrimitive.Root>
+  )
+}
+
+/** Eases its height to its content's, so a panel whose content changes grows and shrinks smoothly. */
+function Resizing({ children }: { children: ReactNode }) {
+  const inner = useRef<HTMLDivElement>(null)
+  const [height, setHeight] = useState<number | 'auto'>('auto')
+  useLayoutEffect(() => {
+    const el = inner.current
+    if (!el) return
+    const observer = new ResizeObserver(() => setHeight(el.offsetHeight))
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+  return (
+    <motion.div
+      initial={false}
+      animate={{ height }}
+      transition={{ type: 'spring', stiffness: 520, damping: 44 }}
+      className="overflow-hidden"
+    >
+      <div ref={inner} className="flex flex-col">
+        {children}
+      </div>
+    </motion.div>
+  )
+}
+
+/** Fades the content in again when the dialog's step changes. */
+function Step({ step, className, children }: { step?: string; className?: string; children: ReactNode }) {
+  // The dialog's own entrance shows the first step; only later steps fade in.
+  const first = useRef(step)
+  return (
+    <motion.div
+      key={step ?? ''}
+      initial={step === first.current ? false : { opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.18, ease: 'easeOut' }}
+      className={className ?? 'flex flex-col'}
+    >
+      {children}
+    </motion.div>
   )
 }

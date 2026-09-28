@@ -42,6 +42,8 @@ export interface RemoteUnit {
   systemRev: number | null
   /** Set while the canvas is published: its public page is `<host>/s/<publicId>`. */
   publicId: string | null
+  /** Screens published on their own: each at `<host>/a/<publicId>`. */
+  screens: { item: string; publicId: string }[]
 }
 
 export interface RemoteRevision {
@@ -169,6 +171,12 @@ function parseUnit(value: unknown): RemoteUnit | null {
     manifest: parseManifest(data.sourceManifest ?? data.source_manifest ?? data.source),
     systemRev: num(data.systemRev) ?? num(data.system_rev) ?? null,
     publicId: str(data.publicId) ?? null,
+    screens: (Array.isArray(data.screens) ? data.screens : []).flatMap((value) => {
+      const screen = record(value)
+      const item = str(screen.item)
+      const publicId = str(screen.publicId)
+      return item && publicId ? [{ item, publicId }] : []
+    }),
   }
 }
 
@@ -382,6 +390,22 @@ export class CloudClient {
       await this.request(
         'POST',
         `/projects/${encodeURIComponent(projectId)}/canvases/${encodeURIComponent(canvas)}/${action}`,
+      ),
+    )
+    return { publicId: str(body.publicId) ?? null }
+  }
+
+  /** Publish one screen of a canvas on its own, or turn its link off (owner only). */
+  async screenAction(
+    projectId: string,
+    canvas: string,
+    screen: string,
+    action: 'publish' | 'unpublish',
+  ): Promise<{ publicId: string | null }> {
+    const body = record(
+      await this.request(
+        'POST',
+        `/projects/${encodeURIComponent(projectId)}/canvases/${encodeURIComponent(canvas)}/screens/${encodeURIComponent(screen)}/${action}`,
       ),
     )
     return { publicId: str(body.publicId) ?? null }

@@ -16,6 +16,7 @@ export type {
   Issue,
   NoteItem,
   ProjectInfo,
+  RuntimeMessage,
   ScreenItem,
   SystemDoc,
   SystemSummary,
@@ -26,12 +27,14 @@ export type {
   UrlItem,
 } from '@shared/types'
 export { DesignViewer, type DesignViewerProps } from './app'
+export { CornerPlate } from './components/corner-plate'
 export { SlidePanel } from './components/slide-panel'
 export { ThemeMenu } from './components/theme-menu'
 export { Bar, useBarCompact } from './components/topbar'
 export { Mark, Wordmark } from './components/wordmark'
 export { cn } from './lib/cn'
 export { copyText } from './lib/copy'
+export { followLink, frameSrc, type LinkTarget, listenToFrame, sendTheme } from './lib/frames'
 export { useIsPhone } from './lib/phone'
 export { ApiError, localSource, resolveUrl, staticSource, type ViewerSource } from './lib/source'
 export { setThemePref, type ThemePref, useTheme, useThemePref } from './lib/theme'
@@ -50,6 +53,7 @@ export {
   iconButtonClass,
 } from './ui/button'
 export { Segmented, Switch } from './ui/choice'
+export { CopyButton } from './ui/copy-button'
 export { Dialog } from './ui/dialog'
 export { Icon, type IconName } from './ui/icon'
 export { floatingSurface, Menu, MenuItem, MenuLabel, MenuSeparator, menuItemClass, menuSurface } from './ui/menu'

@@ -15,7 +15,7 @@ const KIND: Record<ButtonKind, string> = {
 
 export const buttonClass = (kind: ButtonKind = 'secondary', extra?: string) =>
   cn(
-    'inline-flex h-ctrl shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-[6px] px-ctrl text-ctrl font-medium leading-none no-underline transition-[background-color,opacity] duration-100',
+    'inline-flex h-ctrl shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-[6px] px-ctrl text-ctrl font-medium leading-none no-underline transition-[background-color,opacity,scale] duration-100 active:not-disabled:scale-[0.97]',
     'disabled:cursor-not-allowed disabled:opacity-45 aria-disabled:cursor-not-allowed aria-disabled:opacity-45',
     KIND[kind],
     extra,
@@ -65,7 +65,7 @@ export interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement>
 
 export const iconButtonClass = (kind: keyof typeof ICON_KIND = 'ghost', extra?: string) =>
   cn(
-    'inline-flex h-ctrl w-ctrl shrink-0 cursor-pointer items-center justify-center rounded-[6px] p-0 transition-colors duration-100 disabled:cursor-not-allowed disabled:opacity-45',
+    'inline-flex h-ctrl w-ctrl shrink-0 cursor-pointer items-center justify-center rounded-[6px] p-0 transition-[color,background-color,scale] duration-100 active:not-disabled:scale-[0.94] disabled:cursor-not-allowed disabled:opacity-45',
     ICON_KIND[kind],
     extra,
   )

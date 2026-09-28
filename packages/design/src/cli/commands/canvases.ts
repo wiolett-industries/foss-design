@@ -10,6 +10,8 @@ import { bold, CliError, cyan, dim, green, print, red, yellow } from '../log'
 import { runPull } from './sync'
 
 const publicUrl = (host: string, publicId: string) => `${host.replace(/\/+$/, '')}/s/${publicId}`
+/** A screen published on its own: an id, nothing about the project. */
+const screenUrl = (host: string, publicId: string) => `${host.replace(/\/+$/, '')}/a/${publicId}`
 
 function ago(iso: string): string {
   const seconds = Math.max(0, (Date.now() - Date.parse(iso)) / 1000)
@@ -126,25 +128,45 @@ export async function runCanvases(paths: DesignPaths, options: { json: boolean }
   if (cloudNote) print(dim(cloudNote))
 }
 
-/** `design url <canvas>`: the canvas in the web app, and its public link when published. */
+/** `design url <canvas>`: the canvas in the web app, and its public links (the canvas's, its screens'). */
 export async function runUrl(paths: DesignPaths, value: string | undefined, options: { json: boolean }) {
   const canvas = canvasArg(value, 'design url <canvas>')
   const { link, client } = cloud(paths)
   const unit = await remoteCanvas(client, link.project, canvas)
   const url = webUrl(link, canvasUnit(canvas))
   const pub = unit.publicId ? publicUrl(link.host, unit.publicId) : null
-  if (options.json) return print(JSON.stringify({ canvas, url, publicUrl: pub, archived: unit.archived }, null, 2))
+  const screens = unit.screens.map((s) => ({ screen: s.item, publicUrl: screenUrl(link.host, s.publicId) }))
+  if (options.json)
+    return print(JSON.stringify({ canvas, url, publicUrl: pub, screens, archived: unit.archived }, null, 2))
   print(url)
   if (pub) print(`${dim('public')} ${pub}`)
+  for (const screen of screens) print(`${dim(`public ${screen.screen}`)} ${screen.publicUrl}`)
   if (unit.archived) print(dim('archived — `design unarchive` brings it back'))
 }
 
-/** `design publish|unpublish <canvas>`: a public link anyone can open, or none (owner only). */
+/**
+ * `design publish|unpublish <canvas>[/<screen>]`: a public link anyone can open, or none (owner only).
+ * With a screen, the link opens that screen alone, at an address that names nothing of the project.
+ */
 export async function runPublish(paths: DesignPaths, value: string | undefined, publish: boolean) {
   const verb = publish ? 'publish' : 'unpublish'
-  const canvas = canvasArg(value, `design ${verb} <canvas>`)
+  const usage = `design ${verb} <canvas>[/<screen>]`
+  const slash = value?.indexOf('/') ?? -1
+  const screen = value && slash > 0 ? value.slice(slash + 1) : null
+  const canvas = canvasArg(value && slash > 0 ? value.slice(0, slash) : value, usage)
+  if (screen === '') throw new CliError(`Usage: ${usage}`)
   const { link, client } = cloud(paths)
-  await remoteCanvas(client, link.project, canvas)
+  const unit = await remoteCanvas(client, link.project, canvas)
+  if (screen) {
+    if (!publish && !unit.screens.some((s) => s.item === screen))
+      return print(dim(`${canvas}/${screen} has no public link`))
+    const { publicId } = await client.screenAction(link.project, canvas, screen, verb)
+    if (publish) {
+      print(`${green('✓')} Published ${bold(`${canvas}/${screen}`)} on its own: anyone with the link sees this screen alone`)
+      if (publicId) print(`  ${cyan(screenUrl(link.host, publicId))}`)
+    } else print(`${green('✓')} ${bold(`${canvas}/${screen}`)} has no public link now`)
+    return
+  }
   const { publicId } = await client.canvasAction(link.project, canvas, verb)
   if (publish) {
     const id = publicId ?? (await remoteCanvas(client, link.project, canvas)).publicId

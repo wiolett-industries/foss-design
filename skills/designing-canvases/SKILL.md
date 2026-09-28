@@ -149,7 +149,7 @@ foss-design Cloud (app.fossdesign.dev) is free: it keeps the `.design` folder of
    - `$D me` shows the signed-in account: plan, storage used of the limit, projects, pushes. Check it when a push stops on a limit, and point the user at the plans page it prints.
    - `$D canvases` lists the canvases here, and for a linked project also each one's revision, sync state, web link and public link.
    - `$D url <canvas>` prints the canvas's web link (and its public link when published).
-   - `$D publish <canvas>` gives it a public link anyone can open (owner only); `$D unpublish <canvas>` turns it off. Publish only when the user asks.
+   - `$D publish <canvas>` gives it a public link anyone can open (owner only); `$D unpublish <canvas>` turns it off. `$D publish <canvas>/<screen>` publishes one screen alone, at a link that names nothing of the project; links in it open only other screens published that way. Publish only when the user asks.
    - `$D history <canvas>` lists stored revisions; `$D rollback <canvas> <rev>` makes one current again as a new revision and pulls it here. Roll back only when the user asks, and say which revision you restored.
    - `$D archive <canvas>` takes a canvas out of the list and of pushes, keeping its history; `$D unarchive <canvas>` brings it back.
 
