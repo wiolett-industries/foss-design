@@ -133,6 +133,15 @@ Screens link exactly like the app does; nothing in a screen is there only for th
 - Section `title`/`description` label rows ("Sign up", "Errors"); page `title` names the set ("Flow", "States", "Directions").
 - Show an existing page of the running app next to new designs with a `url` item (`http://localhost:5173/settings`), when the app is running.
 
+## Idea boards and markup
+
+The user draws what they have in mind instead of describing it: every page has an **idea board** (the tile above the zoom controls in the viewer) and every screen can carry **markup** drawn over it (*Mark up* in its bar): circles, arrows, crossed-out parts, short notes. In a linked project the cloud's members draw on the same boards and markup, live. Read them whenever the user points at them ("look at what I drew", "do what the board says", "fix what I marked"), and before redesigning a page or screen that has some:
+
+- `$D drawings [<canvas>]` lists the boards and markup with something on them, with the text written on them. It reads through the preview server, which starts if needed and, for a linked project, gets the cloud's drawings first.
+- `$D shot <canvas> --board [--page <id>]` writes the board as PNGs, one per group of sketches: the board has no edges, so what is drawn close together is one picture, cropped to it, and ideas with empty space between them come as separate pictures, numbered in reading order (`$D drawings` says how many groups). `$D shot <canvas>[/<screen>] --markup [--theme dark]` writes each marked-up screen with its markup on top. These pictures are at most 1280 px on the long side, enough to read; when a detail is too small in one (small text on a tall page), shoot it again with `--max 2400` or `--full`. **Read the PNGs**: the drawing is the brief. Take the text on it as written; a sketch shows structure and intent, not exact sizes or colors, so build it from the design system and the product's patterns.
+- Markup is a to-do list for the screen: act on every mark, check the screen (`$D check … --render`, `$D shot`), then erase it with `$D drawings <canvas>/<screen> --clear` and say so at handover. Never clear markup you did not act on, and never erase or edit an idea board: it is the user's.
+- Drawings are not screens: never hand-edit `.drawings.json` in the canvas folder, and do not turn a sketch into a canvas item.
+
 ## foss-design Cloud
 
 foss-design Cloud (app.fossdesign.dev) is free: it keeps the `.design` folder off this machine, organizes canvases by project, and shares them with teammates (editors and viewers) or by a public link, readable on a phone too.

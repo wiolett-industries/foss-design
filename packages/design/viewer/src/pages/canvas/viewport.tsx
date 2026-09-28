@@ -1,8 +1,8 @@
 import type { ImageItem, NoteItem, ScreenItem, Theme, UrlItem } from '@shared/types'
-import { type RefObject, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { type ReactNode, type RefObject, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../../lib/cn'
 import { useStore } from '../../lib/store'
-import { type Camera, type CameraStore, fitRect, intersects, MIN_ZOOM, type Rect } from './camera'
+import { type Camera, type CameraStore, fitRect, gridMover, intersects, MIN_ZOOM, type Rect } from './camera'
 import { type FrameEvents, FrameItem, ImageView, NoteView, SectionHeader } from './items'
 import { isFrame, type Layout, type Placed } from './layout'
 import { Overlay } from './overlay'
@@ -26,9 +26,6 @@ const OPEN_FIT_MIN = 0.2
 const MAX_LOADING = 3
 /** A frame that has not reported ready by then stops holding a loading slot. */
 const LOAD_TIMEOUT = 8000
-/** Grid spacing on screen stays between these, stepping by 4× as the zoom changes. */
-const GRID_MIN = 14
-const GRID_MAX = 96
 
 /** How a frame runs: live, mounted but asleep behind its snapshot, or not mounted. */
 export type FrameMode = 'live' | 'asleep' | 'off'
@@ -53,6 +50,8 @@ interface ViewportProps {
   apiRef: RefObject<ViewportApi | null>
   onPlay(id: string): void
   onSelect(id: string | null, point?: { x: number; y: number }): void
+  /** Drawn over the items, in canvas space: screen markup. */
+  over?: ReactNode
 }
 
 interface Drag {
@@ -64,7 +63,18 @@ interface Drag {
   moved: boolean
 }
 
-export function Viewport({ layout, theme, store, camera, events, capture, apiRef, onPlay, onSelect }: ViewportProps) {
+export function Viewport({
+  layout,
+  theme,
+  store,
+  camera,
+  events,
+  capture,
+  apiRef,
+  onPlay,
+  onSelect,
+  over,
+}: ViewportProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const worldRef = useRef<HTMLDivElement>(null)
   const gridRef = useRef<HTMLDivElement>(null)
@@ -83,7 +93,7 @@ export function Viewport({ layout, theme, store, camera, events, capture, apiRef
     let settle: ReturnType<typeof setTimeout> | undefined
     let viewTimer: ReturnType<typeof setTimeout> | undefined
     let moving = false
-    let gridSize = 0
+    const moveGrid = gridMover(grid)
     const publishView = () => setView({ ...camera.camera, w: root.clientWidth, h: root.clientHeight, moving })
     const apply = (c: Camera) => {
       world.style.transform = `translate3d(${c.x}px, ${c.y}px, 0) scale(${c.z})`
@@ -104,16 +114,7 @@ export function Viewport({ layout, theme, store, camera, events, capture, apiRef
         overlay.style.setProperty('--ty', String(c.y))
         overlay.style.setProperty('--z', String(c.z))
       }
-      // The dot grid is a layer of its own: panning only moves it, zooming repaints it.
-      let size = 24 * c.z
-      while (size < GRID_MIN) size *= 4
-      while (size > GRID_MAX) size /= 4
-      if (size !== gridSize) {
-        gridSize = size
-        grid.style.backgroundSize = `${size}px ${size}px`
-      }
-      const shift = (v: number) => ((((v + GRID_MAX) % size) + size) % size) - size
-      grid.style.transform = `translate3d(${shift(c.x)}px, ${shift(c.y)}px, 0)`
+      moveGrid(c)
       const tiny = c.z < 0.09
       if (store.get().zoomTiny !== tiny) store.set((state) => ({ ...state, zoomTiny: tiny }))
       // Far out, section titles are a few pixels tall and run into the frame labels.
@@ -469,6 +470,7 @@ export function Viewport({ layout, theme, store, camera, events, capture, apiRef
             return <NoteView key={item.id} placed={placed as Placed & { item: NoteItem }} store={store} />
           return <ImageView key={item.id} placed={placed as Placed & { item: ImageItem }} store={store} />
         })}
+        {over}
       </div>
       <Overlay layout={layout} view={view} store={store} overlayRef={overlayRef} />
     </div>

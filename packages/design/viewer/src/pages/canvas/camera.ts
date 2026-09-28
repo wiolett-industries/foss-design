@@ -91,6 +91,15 @@ export class CameraStore {
   }
 }
 
+/** A camera saved in the session under `key`, or null. */
+export function loadCamera(key: string): Camera | null {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(key) ?? 'null')
+    if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y) && Number.isFinite(saved.z)) return saved
+  } catch {}
+  return null
+}
+
 /**
  * The camera that shows `rect` inside a viewport of `w`×`h` with `pad` screen pixels around it.
  * When `rect` does not fit even at `minZoom`, it lines up with the top (and the left, if it is too wide).
@@ -101,6 +110,29 @@ export function fitRect(rect: Rect, w: number, h: number, pad = 72, maxZoom = 1,
   const place = (start: number, size: number, room: number) =>
     size * z <= room - pad * 2 ? room / 2 - (start + size / 2) * z : pad - start * z
   return { z, x: place(rect.x, rect.w, w), y: place(rect.y, rect.h, h) }
+}
+
+/** Grid spacing on screen stays between these, stepping by 4× as the zoom changes. */
+const GRID_MIN = 14
+const GRID_MAX = 96
+
+/**
+ * Keeps a `.canvas-grid` layer in step with a camera. The dot grid is a layer of its own: panning
+ * only moves it, zooming repaints it.
+ */
+export function gridMover(grid: HTMLElement) {
+  let gridSize = 0
+  return (c: Camera) => {
+    let size = 24 * c.z
+    while (size < GRID_MIN) size *= 4
+    while (size > GRID_MAX) size /= 4
+    if (size !== gridSize) {
+      gridSize = size
+      grid.style.backgroundSize = `${size}px ${size}px`
+    }
+    const shift = (v: number) => ((((v + GRID_MAX) % size) + size) % size) - size
+    grid.style.transform = `translate3d(${shift(c.x)}px, ${shift(c.y)}px, 0)`
+  }
 }
 
 export function intersects(a: Rect, b: Rect) {

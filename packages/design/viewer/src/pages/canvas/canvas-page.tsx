@@ -1,11 +1,22 @@
 import * as Popover from '@radix-ui/react-popover'
+import { markupKey } from '@shared/drawings'
 import type { CanvasDoc, CanvasItem, CanvasPage as Page, Theme } from '@shared/types'
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  type CSSProperties,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { useLocation } from 'wouter'
 import { InspectorPanel, useInspection, useModifierHold } from '../../components/inspector'
 import { IssueList } from '../../components/issues'
 import { SlidePanel } from '../../components/slide-panel'
 import { useCanvas } from '../../lib/api'
+import { noDrawings, useDrawingClient } from '../../lib/drawings'
 import { takeFocus } from '../../lib/focus'
 import { followLink } from '../../lib/frames'
 import { useStore } from '../../lib/store'
@@ -15,10 +26,13 @@ import { Icon } from '../../ui/icon'
 import { keepOpenForFrames, Menu, MenuItem, MenuSeparator } from '../../ui/menu'
 import { Notice } from '../../ui/page'
 import { NotFound } from '../not-found'
-import { CameraStore } from './camera'
+import { IdeaBoard } from './board'
+import { CameraStore, loadCamera } from './camera'
 import { CanvasBar, SelectionBar } from './canvas-bar'
+import { useDrawingEditor, useEditorKeys } from './drawing/editor'
 import type { FrameEvents } from './items'
 import { frameOrder, isFrame, layoutPage } from './layout'
+import { MarkupBar, MarkupLayers } from './markup'
 import { pageHref, Sidebar } from './sidebar'
 import { createViewState } from './view-state'
 import { isTyping, Viewport, type ViewportApi } from './viewport'
@@ -27,14 +41,6 @@ const query = new URLSearchParams(window.location.search)
 const CAPTURE = query.has('capture')
 
 const cameraKey = (canvas: string, page: string) => `foss-design.camera.${canvas}.${page}`
-
-function loadCamera(key: string) {
-  try {
-    const saved = JSON.parse(sessionStorage.getItem(key) ?? 'null')
-    if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y) && Number.isFinite(saved.z)) return saved
-  } catch {}
-  return null
-}
 
 /** Screens theme: follows the app until the user picks one for the screens. */
 function useScreenTheme(canvas: CanvasDoc | undefined): [Theme, (theme: Theme) => void] {
@@ -91,6 +97,32 @@ function CanvasView({ canvas, page }: { canvas: CanvasDoc; page: Page | undefine
   const order = useMemo(() => frameOrder(layout), [layout])
   const key = cameraKey(canvas.id, page?.id ?? '')
 
+  // The bottom bars dock between the zoom controls and the problems button.
+  const areaRef = useRef<HTMLDivElement>(null)
+  const zoomRef = useRef<HTMLDivElement>(null)
+  const issuesRef = useRef<HTMLButtonElement>(null)
+  const dock = useDock(areaRef, zoomRef, issuesRef, canvas.issues.length > 0)
+
+  // Drawings: the page's idea board and markup over its screens, when the source has them.
+  const drawings = useDrawingClient(canvas.id, !CAPTURE)
+  const canDraw = useStore(drawings?.store ?? noDrawings, (state) => state.ready && state.canDraw)
+  const markupId = useStore(store, (state) => state.markup)
+  const markupItem = markupId ? layout.items.find((p) => p.item.id === markupId)?.item : undefined
+  const markupEditor = useDrawingEditor(
+    markupItem && canDraw ? drawings : null,
+    markupId ? markupKey(markupId) : null,
+    'red',
+  )
+  useEditorKeys(markupEditor, !!markupEditor)
+  const endMarkup = useCallback(
+    () => store.set((state) => (state.markup ? { ...state, markup: null } : state)),
+    [store],
+  )
+  // A screen that went away, a user who may no longer draw, or Inspect switched on end the markup.
+  useEffect(() => {
+    if (markupId && (!markupItem || !canDraw || inspect)) endMarkup()
+  }, [markupId, markupItem, canDraw, inspect, endMarkup])
+
   // First view: the saved camera, or everything fitted.
   const placed = useRef(false)
   useEffect(() => {
@@ -126,9 +158,20 @@ function CanvasView({ canvas, page }: { canvas: CanvasDoc; page: Page | undefine
         selected: item ? item.id : null,
         active: item && isFrame(item) ? item.id : null,
         hovered: null,
+        // A click on another item ends the markup.
+        markup: item && item.id === state.markup ? state.markup : null,
       }))
     },
     [layout, store],
+  )
+
+  const startMarkup = useCallback(
+    (id: string) => {
+      setInspect(false)
+      store.set((state) => ({ ...state, selected: id, active: null, markup: id, hovered: null }))
+      apiRef.current?.fitItem(id)
+    },
+    [store],
   )
 
   const focusItem = useCallback(
@@ -236,6 +279,11 @@ function CanvasView({ canvas, page }: { canvas: CanvasDoc; page: Page | undefine
       const api = apiRef.current
       const state = store.get()
       const mod = e.metaKey || e.ctrlKey
+      // While a screen is marked up, keys are the markup's; Esc ends it.
+      if (state.markup) {
+        if (e.key === 'Escape') endMarkup()
+        return
+      }
       if (e.key === 'Escape') {
         if (inspection.info) inspection.select(null)
         else if (inspectOn) setInspect(false)
@@ -275,7 +323,7 @@ function CanvasView({ canvas, page }: { canvas: CanvasDoc; page: Page | undefine
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [store, order, layout, play, playFromBar, canvas, page, navigate, inspectOn, inspection])
+  }, [store, order, layout, play, playFromBar, canvas, page, navigate, inspectOn, inspection, endMarkup])
 
   if (CAPTURE) {
     return (
@@ -313,7 +361,7 @@ function CanvasView({ canvas, page }: { canvas: CanvasDoc; page: Page | undefine
         <SlidePanel open={sidebar && !!page} side="left" width={264}>
           {page ? <Sidebar canvas={canvas} page={page} store={store} onPick={focusItem} /> : null}
         </SlidePanel>
-        <div className="relative min-w-0 grow">
+        <div ref={areaRef} className="relative min-w-0 grow" style={dock.style}>
           {page && layout.items.length ? (
             <Viewport
               layout={layout}
@@ -324,6 +372,9 @@ function CanvasView({ canvas, page }: { canvas: CanvasDoc; page: Page | undefine
               capture={false}
               apiRef={apiRef}
               onPlay={play}
+              over={
+                drawings ? <MarkupLayers layout={layout} client={drawings} store={store} editor={markupEditor} /> : null
+              }
               onSelect={(id) => {
                 // A click beside every item lets go of the selection and switches Inspect off.
                 if (!id) {
@@ -346,16 +397,22 @@ function CanvasView({ canvas, page }: { canvas: CanvasDoc; page: Page | undefine
               />
             </div>
           )}
-          <SelectionBar
-            canvas={canvas}
-            store={store}
-            layoutItems={layout.items.map((p) => p.item)}
-            theme={theme}
-            onPlay={play}
-            inspect={inspect}
-          />
-          <ZoomControls camera={camera} apiRef={apiRef} />
-          {canvas.issues.length ? <IssuesButton canvas={canvas} /> : null}
+          {markupItem && markupEditor ? (
+            <MarkupBar item={markupItem} editor={markupEditor} onDone={endMarkup} room={dock.room} />
+          ) : (
+            <SelectionBar
+              canvas={canvas}
+              store={store}
+              layoutItems={layout.items.map((p) => p.item)}
+              theme={theme}
+              onPlay={play}
+              inspect={inspect}
+              onMarkup={canDraw ? startMarkup : undefined}
+            />
+          )}
+          <ZoomControls ref={zoomRef} camera={camera} apiRef={apiRef} />
+          {drawings && page ? <IdeaBoard client={drawings} canvasId={canvas.id} page={page} /> : null}
+          {canvas.issues.length ? <IssuesButton ref={issuesRef} canvas={canvas} /> : null}
         </div>
         <SlidePanel open={inspectOn} side="right" width={320}>
           <InspectorPanel
@@ -385,9 +442,18 @@ function ZoomLabel({ camera }: { camera: CameraStore }) {
   return <>{Math.round(zoom * 100)}%</>
 }
 
-function ZoomControls({ camera, apiRef }: { camera: CameraStore; apiRef: React.RefObject<ViewportApi | null> }) {
+function ZoomControls({
+  ref,
+  camera,
+  apiRef,
+}: {
+  ref: React.Ref<HTMLDivElement>
+  camera: CameraStore
+  apiRef: React.RefObject<ViewportApi | null>
+}) {
   return (
     <div
+      ref={ref}
       data-ui
       className="absolute right-4 bottom-5 z-20 flex h-[46px] items-center gap-0.5 rounded-[10px] border border-rule bg-surface px-1.5 shadow-pop"
     >
@@ -425,12 +491,13 @@ function ZoomControls({ camera, apiRef }: { camera: CameraStore; apiRef: React.R
   )
 }
 
-function IssuesButton({ canvas }: { canvas: CanvasDoc }): ReactNode {
+function IssuesButton({ ref, canvas }: { ref: React.Ref<HTMLButtonElement>; canvas: CanvasDoc }): ReactNode {
   const errors = canvas.issues.filter((issue) => issue.severity === 'error').length
   return (
     <Popover.Root>
       <Popover.Trigger asChild>
         <button
+          ref={ref}
           type="button"
           data-ui
           className="absolute bottom-5 left-4 z-20 flex h-[46px] cursor-pointer items-center gap-2 rounded-[10px] border border-rule bg-surface px-3.5 text-[13px] font-medium shadow-pop hover:bg-soft"
@@ -453,6 +520,41 @@ function IssuesButton({ canvas }: { canvas: CanvasDoc }): ReactNode {
       </Popover.Portal>
     </Popover.Root>
   )
+}
+
+/** Room a docked bar keeps from a corner control. */
+const DOCK_GAP = 10
+
+/**
+ * What the bottom bars must stay clear of: the zoom controls on the right and the problems button on
+ * the left, as `--dock-right` and `--dock-left` for BottomDock, and the width left between them.
+ */
+function useDock(
+  area: React.RefObject<HTMLDivElement | null>,
+  right: React.RefObject<HTMLElement | null>,
+  left: React.RefObject<HTMLElement | null>,
+  hasLeft: boolean,
+) {
+  const [sizes, setSizes] = useState({ area: 0, left: 0, right: 0 })
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the problems button comes and goes with hasLeft
+  useLayoutEffect(() => {
+    const measure = () =>
+      setSizes((prev) => {
+        const next = {
+          area: area.current?.clientWidth ?? 0,
+          left: left.current ? left.current.offsetWidth + DOCK_GAP : 0,
+          right: right.current ? right.current.offsetWidth + DOCK_GAP : 0,
+        }
+        return next.area === prev.area && next.left === prev.left && next.right === prev.right ? prev : next
+      })
+    measure()
+    const observer = new ResizeObserver(measure)
+    for (const el of [area.current, left.current, right.current]) if (el) observer.observe(el)
+    return () => observer.disconnect()
+  }, [area, left, right, hasLeft])
+  const style = { '--dock-left': `${sizes.left}px`, '--dock-right': `${sizes.right}px` } as CSSProperties
+  // The dock spans the area less 16px each side.
+  return { style, room: Math.max(0, sizes.area - 32 - sizes.left - sizes.right) }
 }
 
 /** Mounted screen frames on the page, as a list that keeps its identity while its members do. */

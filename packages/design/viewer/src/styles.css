@@ -37,6 +37,11 @@
   --grid-dot: #c9ced5;
   --note: #fdf3e3;
   --note-line: #edd6b1;
+  /* Inks of boards and screen markup: bright enough to read over any screen. */
+  --draw-ink: #1b1f24;
+  --draw-red: #e03131;
+  --draw-blue: #1971c2;
+  --draw-green: #2b8a3e;
   --scrollbar: #c3c9d0;
   --scrollbar-hover: #9aa2ac;
   color-scheme: light;
@@ -71,6 +76,10 @@
   --grid-dot: #30343a;
   --note: #2a2415;
   --note-line: #574420;
+  --draw-ink: #e6e8eb;
+  --draw-red: #ff6b6b;
+  --draw-blue: #4dabf7;
+  --draw-green: #51cf66;
   --scrollbar: #3a3f46;
   --scrollbar-hover: #565d66;
   color-scheme: dark;

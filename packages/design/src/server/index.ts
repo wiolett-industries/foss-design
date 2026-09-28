@@ -10,6 +10,7 @@ import { SYSTEM_CANVAS } from '../core/system'
 import { escapeHtml, toPosix } from '../core/text'
 import type { Theme } from '../shared/types'
 import { handleApi, sendJson } from './api'
+import { DrawingHub } from './drawings'
 import { Entries, HTML_BOOT } from './entries'
 import { EventHub } from './events'
 import { FRAME_HOST, isAllowedHost, isFrameApi, parseHost, VIEWER_HOST } from './hosts'
@@ -84,6 +85,7 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
   entries.sync()
   const links = linkShippedPackages(paths, project.appDir())
   const events = new EventHub()
+  const drawings = new DrawingHub(paths, (id) => project.canvasIds().includes(id))
   const httpServer = http.createServer()
   const listening = () => (httpServer.address() as { port: number } | null)?.port ?? 0
 
@@ -142,7 +144,7 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' })
     res.end(html)
   }
-  const ctx = { project, events, snapshots }
+  const ctx = { project, events, snapshots, drawings }
   // Frame HTML goes through transformIndexHtml, which puts the /_fs/ base in front of these.
   const systemCssUrl = `/${relToDesign(paths, entries.systemCssFile())}`
   const bootUrl = `/${relToDesign(paths, path.join(entries.dir, HTML_BOOT))}`
@@ -265,6 +267,13 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
     }
   })
 
+  // Drawings sockets; Vite's HMR socket on the same server answers only its own protocol.
+  httpServer.on('upgrade', (req: IncomingMessage, socket, head: Buffer) => {
+    const pathname = new URL(req.url ?? '/', 'http://localhost').pathname
+    if (pathname.startsWith('/api/drawings/')) drawings.upgrade(req, socket, head, listening(), options.host)
+    else if (pathname.startsWith('/api/')) socket.destroy()
+  })
+
   // Keep the project model and open viewers in step with the files.
   const pending = new Map<string, () => void>()
   let flushTimer: ReturnType<typeof setTimeout> | undefined
@@ -300,6 +309,10 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
     } else if (rel.startsWith('canvas/')) {
       const [, id, ...rest] = rel.split('/')
       if (!id) return
+      if (rest.join('/') === '.drawings.json') {
+        drawings.fileChanged(id)
+        return
+      }
       const structural = event !== 'change' || rest.join('/') === 'canvas.json'
       if (!structural) return
       queue(`canvas:${id}`, () => {
@@ -333,6 +346,7 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
       if (closed) return
       closed = true
       events.close()
+      drawings.close()
       await vite.close()
       await new Promise<void>((resolve) => {
         httpServer.close(() => resolve())

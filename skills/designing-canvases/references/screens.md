@@ -136,4 +136,5 @@ Screens run in a normal browser page on `localhost`: they may call real APIs and
 
 - `design check <canvas> --render` (or `<canvas>/<screen>…`, or `<canvas> --page <id>`) loads the screens in headless Chrome and reports build errors, uncaught exceptions and console errors, plus `canvas.json` problems, `go()` calls, and links that lead to no screen (grouped by path, with the screens they appear in).
 - `design shot <canvas>[/<screen>] [--theme dark] [--page <id>] [--overview]` writes PNGs and prints their paths. Read them to review the result.
+- `design shot <canvas> --board [--page <id>]` shoots the idea boards drawn on, one PNG per group of sketches; `design shot <canvas>[/<screen>] --markup` the screens with the user's markup drawn over them. `design drawings [<canvas>]` lists both, with the text written on them. Those pictures are at most 1280 px on the long side; `--max <px>` or `--full` for more.
 - The viewer's frames show Vite's error overlay for syntax and import errors while you edit.

@@ -5,7 +5,9 @@ import { iconProblem, MAX_ICON_BYTES, writeIcon } from '../core/icon'
 import { packageVersion } from '../core/paths'
 import type { DesignProject } from '../core/project'
 import { isShowableSource } from '../core/system'
+import { isDrawingKey } from '../shared/drawings'
 import type { Theme } from '../shared/types'
+import type { DrawingHub } from './drawings'
 import type { EventHub } from './events'
 import { depsHash, type SnapshotStore, sourceHash } from './snapshots'
 
@@ -34,6 +36,7 @@ export interface ApiContext {
   project: DesignProject
   events: EventHub
   snapshots: SnapshotStore
+  drawings: DrawingHub
 }
 
 /** `/api/*`. Returns false for paths it does not know. */
@@ -43,7 +46,7 @@ export async function handleApi(
   res: ServerResponse,
   url: URL,
 ): Promise<boolean> {
-  const { project, events, snapshots } = ctx
+  const { project, events, snapshots, drawings } = ctx
   const route = url.pathname.slice('/api'.length)
   const method = req.method ?? 'GET'
 
@@ -108,6 +111,27 @@ export async function handleApi(
     } catch (error) {
       sendJson(res, 400, { error: (error as Error).message })
     }
+    return true
+  }
+  // Drawings for the CLI: read them (after the cloud answered, when linked), or erase one. Viewers
+  // use the socket. DELETE, so a page elsewhere cannot send it without the preflight it fails.
+  const drawingsMatch = /^\/drawings\/([^/]+)(?:\/([^/]+))?$/.exec(route)
+  if (drawingsMatch) {
+    const canvas = decodeURIComponent(drawingsMatch[1]!)
+    const key = drawingsMatch[2] ? decodeURIComponent(drawingsMatch[2]) : null
+    if (method === 'GET' && !key) {
+      const found = await drawings.read(canvas)
+      if (found) sendJson(res, 200, found)
+      else sendJson(res, 404, { error: `No canvas "${canvas}"` })
+      return true
+    }
+    if (method === 'DELETE' && key && isDrawingKey(key)) {
+      const erased = await drawings.clear(canvas, key)
+      if (erased === null) sendJson(res, 404, { error: `No canvas "${canvas}"` })
+      else sendJson(res, 200, { erased })
+      return true
+    }
+    sendJson(res, 405, { error: 'GET /api/drawings/<canvas> or DELETE /api/drawings/<canvas>/<key>' })
     return true
   }
   const snapshotPost = /^\/snapshots\/([^/]+)\/([^/]+)$/.exec(route)

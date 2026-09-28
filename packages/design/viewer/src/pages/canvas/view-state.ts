@@ -21,6 +21,8 @@ export interface ViewState {
   frameEls: Record<string, HTMLIFrameElement | null>
   /** Inspect mode: screens take the pointer so the inspector can see it. */
   inspecting: boolean
+  /** The screen being marked up: its markup takes the pointer. */
+  markup: string | null
 }
 
 export function createViewState() {
@@ -35,6 +37,7 @@ export function createViewState() {
     zoomTiny: false,
     frameEls: {},
     inspecting: false,
+    markup: null,
   })
 }
 

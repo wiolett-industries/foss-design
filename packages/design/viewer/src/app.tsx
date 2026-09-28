@@ -19,6 +19,7 @@ import {
   viewerKeys,
 } from './lib/viewer'
 import { CanvasPage } from './pages/canvas/canvas-page'
+import { BoardCapture, MarkupCapture } from './pages/canvas/drawing-capture'
 import { FullPage } from './pages/canvas/full-page'
 import { PhoneCanvas } from './pages/canvas/phone-view'
 import { PlayPage } from './pages/canvas/play-page'
@@ -66,6 +67,13 @@ function Routes() {
         {(params) => <FullPage canvasId={params.canvas} itemId={params.item} />}
       </Route>
       <Route path="/c/:canvas/play/:item">{(params) => pages.play(params.canvas, params.item)}</Route>
+      {/* What `design shot --board` and `--markup` take pictures of. */}
+      <Route path="/c/:canvas/board/:page">
+        {(params) => <BoardCapture canvasId={params.canvas} pageId={params.page} />}
+      </Route>
+      <Route path="/c/:canvas/markup/:item">
+        {(params) => <MarkupCapture canvasId={params.canvas} itemId={params.item} />}
+      </Route>
       <Route path="/c/:canvas/p/:page">{(params) => pages.canvas(params.canvas, params.page)}</Route>
       <Route path="/c/:canvas">{(params) => pages.canvas(params.canvas)}</Route>
       <Route path="/system/*?">

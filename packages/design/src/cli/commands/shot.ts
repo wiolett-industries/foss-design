@@ -10,18 +10,38 @@ import { SYSTEM_CANVAS } from '../../core/system'
 import { liveServer } from '../../server/state'
 import type { Theme } from '../../shared/types'
 import { CliError, dim, print, red, warn } from '../log'
+import { drawn, readDrawings } from './drawings'
 import { ensureServer } from './preview'
 
 const OVERVIEW_TIMEOUT = 90000
+const DRAWING_TIMEOUT = 45000
 
-export async function runShot(
-  paths: DesignPaths,
-  target: string,
-  options: { page?: string; theme?: Theme; out?: string; overview: boolean },
-) {
+interface ShotOptions {
+  page?: string
+  theme?: Theme
+  out?: string
+  overview: boolean
+  board?: boolean
+  markup?: boolean
+  /** Longest side of a board or markup picture in pixels; 0 keeps full size. */
+  max?: number
+}
+
+/** What agents read comfortably: they downscale bigger pictures anyway, and pixels cost tokens. */
+export const DRAWING_MAX_SIDE = 1280
+
+export async function runShot(paths: DesignPaths, target: string, options: ShotOptions) {
   const [canvasId = '', screenId] = target.split('/')
   const project = new DesignProject(paths, DEV_URLS)
-  if (canvasId === SYSTEM_CANVAS) return shootSystem(paths, project, screenId, options)
+  if (canvasId === SYSTEM_CANVAS) {
+    if (options.board || options.markup) throw new CliError('--board and --markup apply to canvases, not @system')
+    return shootSystem(paths, project, screenId, options)
+  }
+  if (options.board && options.markup) throw new CliError('Take --board and --markup one at a time')
+  if (options.max !== undefined && !options.board && !options.markup)
+    throw new CliError('--max and --full size the pictures of --board and --markup')
+  if (options.board && screenId)
+    throw new CliError('Boards belong to pages: design shot <canvas> --board [--page <id>]')
   const canvas = project.canvas(canvasId)
   if (!canvas) {
     const known = project.canvasIds()
@@ -41,6 +61,17 @@ export async function runShot(
   let failed = false
 
   try {
+    if (options.board || options.markup) {
+      if (!fs.existsSync(PKG.viewer)) throw new CliError('The viewer is not built, so there are no drawings to shoot.')
+      const drawingsFailed = await shootDrawings(browser, base, canvasId, outDir, theme, {
+        board: !!options.board,
+        page: options.page,
+        screen: screenId,
+        max: options.max ?? DRAWING_MAX_SIDE,
+      })
+      if (drawingsFailed) process.exitCode = 1
+      return
+    }
     if (options.overview) {
       if (!fs.existsSync(PKG.viewer)) throw new CliError('The viewer is not built, so there is no canvas to shoot.')
       const pages = options.page
@@ -85,6 +116,76 @@ export async function runShot(
     await browser.close()
   }
   if (failed) process.exitCode = 1
+}
+
+/**
+ * Idea boards (`--board`) or screens with their markup (`--markup`), from the viewer's capture
+ * pages: each board at its own size, each screen at its frame's. Without a page or screen named,
+ * every one with something drawn on it. True when any could not be shot.
+ */
+async function shootDrawings(
+  browser: Browser,
+  base: string,
+  canvasId: string,
+  outDir: string,
+  theme: Theme,
+  want: { board: boolean; page?: string; screen?: string; max: number },
+): Promise<boolean> {
+  const port = Number(new URL(base).port)
+  const { drawings, cloud } = await readDrawings(port, canvasId)
+  if (cloud === 'offline' || cloud === 'connecting')
+    warn('the cloud did not answer in time: these are the drawings on this machine')
+  const found = drawn(drawings, want.board ? 'board' : 'markup')
+  const named = want.board ? want.page : want.screen
+  const ids = named ? [named] : [...found.keys()]
+  if (!ids.length) {
+    print(want.board ? `No idea board drawn on in "${canvasId}".` : `No screen marked up in "${canvasId}".`)
+    return false
+  }
+  if (named && !found.has(named))
+    print(dim(want.board ? `Nothing on the board of "${named}" yet.` : `No markup on "${named}" yet.`))
+  let failed = false
+  for (const id of ids) {
+    const kind = want.board ? 'board' : 'markup'
+    const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, colorScheme: theme })
+    try {
+      const url = `${base}/c/${encodeURIComponent(canvasId)}/${kind}/${encodeURIComponent(id)}?capture=1&theme=${theme}&max=${want.max}`
+      await page.goto(url, { waitUntil: 'load' })
+      await page.waitForFunction(
+        () => (window as { __DESIGN_DRAWING_READY__?: boolean }).__DESIGN_DRAWING_READY__ === true,
+        null,
+        { timeout: DRAWING_TIMEOUT },
+      )
+      // A board's pictures are cropped to what is drawn; a screen's is its frame's size.
+      const size = await page.evaluate(
+        () => (window as { __DESIGN_DRAWING_SIZE__?: { width: number; height: number } }).__DESIGN_DRAWING_SIZE__,
+      )
+      if (size?.width && size.height)
+        await page.setViewportSize({ width: Math.round(size.width), height: Math.min(Math.round(size.height), 16000) })
+      await page.waitForTimeout(200)
+      if (!want.board) {
+        const file = path.join(outDir, `${id}.markup.${theme}.png`)
+        await page.screenshot({ path: file })
+        print(file)
+        continue
+      }
+      // One picture per group of strokes on the board, numbered when there are several.
+      const parts = await page.evaluate(
+        () => (window as { __DESIGN_DRAWING_PARTS__?: number }).__DESIGN_DRAWING_PARTS__ ?? 0,
+      )
+      for (let part = 0; part < parts; part++) {
+        const file = path.join(outDir, parts > 1 ? `${id}.board.${part + 1}.${theme}.png` : `${id}.board.${theme}.png`)
+        await page.locator(`[data-part="${part}"]`).screenshot({ path: file })
+        print(file)
+      }
+    } catch (error) {
+      failed = true
+      print(`${red('✗')} ${canvasId}/${id}: ${(error as Error).message.split('\n')[0]}`)
+    } finally {
+      await page.close().catch(() => {})
+    }
+  }
+  return failed
 }
 
 async function serverBase(paths: DesignPaths): Promise<string> {

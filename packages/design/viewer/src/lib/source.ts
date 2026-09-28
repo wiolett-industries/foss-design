@@ -26,6 +26,12 @@ export interface ViewerSource {
   source(path: string, unit: string): Promise<string>
   /** Set the project icon (an SVG, PNG or WebP), or remove it with null. Without it the viewer offers no icon controls. */
   setIcon?(file: Blob | null): Promise<void>
+  /**
+   * The WebSocket URL of a canvas's drawings: the idea board of each page and the markup over each
+   * screen, live for everyone who has the canvas open (`src/shared/drawings.ts` holds the protocol).
+   * Without it the viewer shows no drawings.
+   */
+  drawings?(canvas: string): string
 }
 
 export class ApiError extends Error {
@@ -87,6 +93,8 @@ export const localSource: ViewerSource = {
     if (!response.ok) throw new ApiError(response.status, `Could not read ${path}`)
     return response.text()
   },
+  drawings: (canvas) =>
+    `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/api/drawings/${encodeURIComponent(canvas)}`,
   async setIcon(file) {
     const response = await fetch('/api/icon', {
       method: file ? 'PUT' : 'DELETE',

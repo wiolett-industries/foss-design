@@ -23,7 +23,7 @@ This repository holds foss-design: the `foss-design` npm package (CLI, preview s
 - Keep the plugin name and version aligned in `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json` and `packages/design/package.json`.
 - Every skill folder name equals its frontmatter `name`; descriptions stay on one line.
 - No hooks: installing the plugin must not change a user's settings or run anything.
-- Screens are the user's code: the server must never modify files outside `.design/.cache` and `.design/node_modules`. The one exception is `.design/icon.*`, written only when the user sets or removes the project icon in the viewer.
+- Screens are the user's code: the server must never modify files outside `.design/.cache` and `.design/node_modules`. Two exceptions, both written only on the user's action in the viewer (or `design drawings --clear`): `.design/icon.*`, when the user sets or removes the project icon, and `.design/canvas/<id>/.drawings.json`, the canvas's idea boards and screen markup as they are drawn (and, for a linked project, as the cloud's members draw them).
 
 ## Verify
 

@@ -1,6 +1,6 @@
 import type { CanvasDoc, CanvasItem, CanvasPage as Page, Theme } from '@shared/types'
 import { AnimatePresence, motion } from 'motion/react'
-import { useRef } from 'react'
+import { type ReactNode, useRef } from 'react'
 import { Link, useLocation } from 'wouter'
 import { SearchButton } from '../../components/search-button'
 import { ThemeMenu } from '../../components/theme-menu'
@@ -142,6 +142,22 @@ export function CanvasBar({
   )
 }
 
+/**
+ * The strip along the canvas's bottom edge that holds a bar: centred while there is room, moved aside
+ * when there is not, and never under the controls in the corners, whose widths come in as
+ * `--dock-left` and `--dock-right` (see useDock).
+ */
+export function BottomDock({ children }: { children: ReactNode }) {
+  return (
+    <div
+      data-ui
+      className="pointer-events-none absolute inset-x-4 bottom-5 z-20 grid grid-cols-[minmax(var(--dock-left,0px),1fr)_minmax(0,auto)_minmax(var(--dock-right,0px),1fr)]"
+    >
+      <div className="col-start-2 flex min-w-0 justify-center">{children}</div>
+    </div>
+  )
+}
+
 /** The selected item's name and actions, floating over the bottom of the canvas; it eases in and out. */
 export function SelectionBar({
   canvas,
@@ -150,6 +166,7 @@ export function SelectionBar({
   theme,
   onPlay,
   inspect,
+  onMarkup,
 }: {
   canvas: CanvasDoc
   store: ViewStore
@@ -157,11 +174,13 @@ export function SelectionBar({
   theme: Theme
   onPlay(id: string): void
   inspect: boolean
+  /** Mark up a screen; without it, where no one may draw, there is no such button. */
+  onMarkup?: (id: string) => void
 }) {
   const selected = useStore(store, (state) => state.selected)
   const item = layoutItems.find((i) => i.id === selected)
   return (
-    <div data-ui className="pointer-events-none absolute inset-x-0 bottom-5 z-20 flex justify-center px-4">
+    <BottomDock>
       <AnimatePresence>
         {item ? (
           <SelectedBar
@@ -172,10 +191,11 @@ export function SelectionBar({
             theme={theme}
             onPlay={onPlay}
             inspect={inspect}
+            onMarkup={onMarkup}
           />
         ) : null}
       </AnimatePresence>
-    </div>
+    </BottomDock>
   )
 }
 
@@ -186,6 +206,7 @@ function SelectedBar({
   theme,
   onPlay,
   inspect,
+  onMarkup,
 }: {
   canvas: CanvasDoc
   store: ViewStore
@@ -193,6 +214,7 @@ function SelectedBar({
   theme: Theme
   onPlay(id: string): void
   inspect: boolean
+  onMarkup?: (id: string) => void
 }) {
   const { slots } = useViewer()
   const status = useStore(store, (state) => state.frames[item.id])
@@ -207,7 +229,7 @@ function SelectedBar({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 10, scale: 0.98, transition: { duration: 0.14, ease: 'easeIn' } }}
       transition={{ type: 'spring', duration: 0.26, bounce: 0.12 }}
-      className="relative flex w-fit max-w-[95%] min-w-0 flex-col"
+      className="relative flex w-fit max-w-full min-w-0 flex-col"
     >
       {/* While Inspect is on (or ⌘/Ctrl held), a tab slides out from behind the bar's top edge to say
             how it works: as wide as its text, 20px short of the bar's ends at most; the bar's border
@@ -265,6 +287,11 @@ function SelectedBar({
           {frame ? (
             <Tooltip content="Reload">
               <IconButton icon="refresh" label="Reload" onClick={reload} />
+            </Tooltip>
+          ) : null}
+          {item.kind === 'screen' && onMarkup ? (
+            <Tooltip content="Mark up">
+              <IconButton icon="edit" label="Mark up" onClick={() => onMarkup(item.id)} />
             </Tooltip>
           ) : null}
           {item.kind === 'screen' ? (

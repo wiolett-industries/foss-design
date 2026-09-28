@@ -7,6 +7,7 @@ import { runBuild } from './commands/build'
 import { runArchive, runCanvases, runHistory, runMe, runPublish, runRollback, runUrl } from './commands/canvases'
 import { runCheck } from './commands/check'
 import { runLink, runLogin, runLogout } from './commands/cloud'
+import { runDrawings } from './commands/drawings'
 import { runIcon } from './commands/icon'
 import { runImport } from './commands/import'
 import { runMerge } from './commands/merge'
@@ -60,8 +61,17 @@ ${bold('Verify')}
             [--page <id>]                    viewer to show while frames do not run (push does this
                                              for the canvases it pushes)
   shot <canvas>[/<screen>] [--page <id>]     Screenshot screens with Chrome (PNG paths are printed);
-       [--theme light|dark] [--out <dir>]    @system or @system/<id> shoots the design system specimens
-       [--overview]
+       [--theme light|dark] [--out <dir>]    @system or @system/<id> shoots the design system specimens;
+       [--overview] [--board | --markup]     --board shoots the idea boards drawn on (or --page's),
+       [--max <px> | --full]                 one PNG per group of sketches; --markup the screens with
+                                             markup, drawn over them. Those pictures are at most 1280 px
+                                             on the long side; --max sets another limit, --full none
+
+${bold('Drawings')}  ${dim('idea boards of pages and markup over screens, drawn in the viewer; shared live in the cloud')}
+  drawings [<canvas>[/<screen>]] [--json]    Boards and markup with something on them: strokes and the
+                                             text written on them (read through the preview server,
+                                             which syncs them with the cloud when linked)
+  drawings <canvas>/<screen> --clear         Erase a screen's markup once it is dealt with
 
 ${bold('Share')}
   build [canvas…] [--out <dir>] [--tar]      Static site of the canvases and the design system
@@ -120,6 +130,17 @@ function projectPaths(rootOption: string | undefined, requireDesign = true) {
   return paths
 }
 
+/** `--max <px>` or `--full` (0) for drawing pictures; undefined keeps the default. */
+function drawingMax(max: string | undefined, full: boolean): number | undefined {
+  if (full && max !== undefined) throw new CliError('Pass --max or --full, not both')
+  if (full) return 0
+  if (max === undefined) return undefined
+  const value = Number(max)
+  if (!Number.isInteger(value) || value < 200 || value > 8000)
+    throw new CliError('--max takes a number of pixels, 200 to 8000')
+  return value
+}
+
 async function main(argv: string[]) {
   const { values, positionals } = parseArgs({
     args: argv,
@@ -148,6 +169,11 @@ async function main(argv: string[]) {
       theme: { type: 'string' },
       out: { type: 'string' },
       overview: { type: 'boolean' },
+      board: { type: 'boolean' },
+      markup: { type: 'boolean' },
+      clear: { type: 'boolean' },
+      max: { type: 'string' },
+      full: { type: 'boolean' },
       tar: { type: 'boolean' },
       new: { type: 'string' },
       resolved: { type: 'string', multiple: true },
@@ -227,8 +253,13 @@ async function main(argv: string[]) {
         theme,
         out: values.out,
         overview: !!values.overview,
+        board: !!values.board,
+        markup: !!values.markup,
+        max: drawingMax(values.max, !!values.full),
       })
     }
+    case 'drawings':
+      return runDrawings(projectPaths(values.root), rest[0], { json: !!values.json, clear: !!values.clear })
     case 'build':
       return runBuild(projectPaths(values.root), rest, { out: values.out, tar: !!values.tar })
     case 'login':
