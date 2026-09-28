@@ -13,7 +13,7 @@ const publicUrl = (host: string, publicId: string) => `${host.replace(/\/+$/, ''
 /** A screen published on its own: an id, nothing about the project. */
 const screenUrl = (host: string, publicId: string) => `${host.replace(/\/+$/, '')}/a/${publicId}`
 
-function ago(iso: string): string {
+export function ago(iso: string): string {
   const seconds = Math.max(0, (Date.now() - Date.parse(iso)) / 1000)
   if (!Number.isFinite(seconds)) return ''
   if (seconds < 60) return 'just now'
@@ -81,7 +81,9 @@ export async function runCanvases(paths: DesignPaths, options: { json: boolean }
     const doc = local.find((entry) => entry.id === id)
     const unit = remote?.get(canvasUnit(id))
     const status =
-      link && remote ? unitStatus(canvasUnit(id), link, scan?.units.get(canvasUnit(id))?.manifest, remote) : null
+      link && remote
+        ? unitStatus(canvasUnit(id), link, scan?.units.get(canvasUnit(id))?.manifest, remote, paths.design)
+        : null
     const frames = doc?.pages
       .flatMap((page) => page.sections.flatMap((section) => section.items))
       .filter((item) => item.kind === 'screen' || item.kind === 'url')

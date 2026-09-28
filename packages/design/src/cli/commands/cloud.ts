@@ -80,7 +80,11 @@ function printProjects(title: string, projects: RemoteProject[], linked: string 
   const width = Math.max(...projects.map((project) => project.id.length))
   const nameWidth = Math.max(...projects.map((project) => project.name.length))
   for (const project of projects) {
-    const flags = [project.archived && yellow('archived'), project.banned && yellow('banned')].filter(Boolean)
+    const flags = [
+      project.kind === 'pages' && dim('pages'),
+      project.archived && yellow('archived'),
+      project.banned && yellow('banned'),
+    ].filter(Boolean)
     print(
       `  ${project.id.padEnd(width)}  ${project.name.padEnd(nameWidth)}  ${dim(project.role.padEnd(6))}` +
         (flags.length ? `  ${flags.join(' ')}` : '') +
@@ -127,6 +131,10 @@ export async function runLink(paths: DesignPaths, wanted: string | undefined, op
     project = found
   }
   if (project.banned) throw new CliError(`${project.name} is blocked by moderation and cannot be linked.`)
+  if (project.kind === 'pages')
+    throw new CliError(
+      `${project.name} is a pages project: \`design page\` publishes into it, and .design links to a project of canvases.`,
+    )
 
   if (current?.host === host && current.project === project.id) {
     print(`${dim('Already linked to')} ${project.name} ${dim(`(${project.id}, ${project.role})`)}`)
@@ -145,7 +153,7 @@ export async function runLink(paths: DesignPaths, wanted: string | undefined, op
   const remote = project.archived ? null : await client.units(project.id)
   const scan = scanLocal(paths)
   const states = allUnitKeys(link, scan.units, remote).map(
-    (key) => unitStatus(key, link, scan.units.get(key)?.manifest, remote).state,
+    (key) => unitStatus(key, link, scan.units.get(key)?.manifest, remote, paths.design).state,
   )
   const count = (state: string) => states.filter((item) => item === state).length
   const ahead = count('remote_ahead')

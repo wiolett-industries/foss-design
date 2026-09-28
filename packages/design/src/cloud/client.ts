@@ -21,10 +21,14 @@ export interface Me {
   name?: string
 }
 
+export type ProjectKind = 'design' | 'pages'
+
 export interface RemoteProject {
   id: string
   name: string
   role: string
+  /** `design`: canvases and a design system from `.design`; `pages`: pages from `design page`. */
+  kind: ProjectKind
   archived: boolean
   banned: boolean
   /** sha256 of the project icon, or null without one. */
@@ -44,6 +48,19 @@ export interface RemoteUnit {
   publicId: string | null
   /** Screens published on their own: each at `<host>/a/<publicId>`. */
   screens: { item: string; publicId: string }[]
+}
+
+/** A page of a pages project. */
+export interface RemotePage {
+  slug: string
+  title: string
+  headRev: number
+  bytes: number
+  updatedAt: string
+  archived: boolean
+  banned: boolean
+  /** Set while the page is published: its link is `<host>/a/<publicId>`. */
+  publicId: string | null
 }
 
 export interface RemoteRevision {
@@ -152,6 +169,7 @@ function parseProject(value: unknown, fallbackRole: string): RemoteProject | nul
     id,
     name: text(data.name) ?? id,
     role: text(data.role) ?? fallbackRole,
+    kind: data.kind === 'pages' ? 'pages' : 'design',
     archived: flag(data.archived, data.archivedAt, data.archived_at),
     banned: flag(data.banned, data.bannedAt, data.banned_at),
     icon: /[?&]v=([0-9a-f]{64})/.exec(text(data.icon) ?? '')?.[1] ?? null,
@@ -180,6 +198,22 @@ function parseUnit(value: unknown): RemoteUnit | null {
   }
 }
 
+function parsePage(value: unknown): RemotePage | null {
+  const data = record(value)
+  const slug = str(data.slug)
+  if (!slug) return null
+  return {
+    slug,
+    title: text(data.title) ?? slug,
+    headRev: num(data.headRev) ?? 0,
+    bytes: num(data.bytes) ?? 0,
+    updatedAt: str(data.updatedAt) ?? '',
+    archived: flag(data.archivedAt),
+    banned: flag(data.bannedAt),
+    publicId: str(data.publicId) ?? null,
+  }
+}
+
 function parseRevision(value: unknown): RemoteRevision | null {
   const data = record(value)
   const rev = num(data.rev)
@@ -199,6 +233,26 @@ function parseRevision(value: unknown): RemoteRevision | null {
         : (num(stats.sourceBytes) ?? 0) + (num(stats.buildBytes) ?? 0),
     rollbackAllowed: data.rollbackAllowed === true,
   }
+}
+
+/** Errors of a connection that was never made: the request did not leave this machine. */
+const NOT_CONNECTED = new Set([
+  'ETIMEDOUT',
+  'ECONNREFUSED',
+  'ENOTFOUND',
+  'EAI_AGAIN',
+  'ENETUNREACH',
+  'EHOSTUNREACH',
+  'ENETDOWN',
+  'UND_ERR_CONNECT_TIMEOUT',
+])
+/** Tries after the first for a request that could not connect: 1, 2 and 4 seconds apart. */
+const CONNECT_RETRIES = 3
+
+/** The system error code under a failed fetch (`ETIMEDOUT`), also when each address tried failed. */
+function networkCode(error: unknown): string | undefined {
+  const cause = (error as { cause?: { code?: string; errors?: { code?: string }[] } }).cause
+  return cause?.code ?? cause?.errors?.find((inner) => inner.code)?.code
 }
 
 /** Retry on no answer and on 5xx: 3 retries with backoff. */
@@ -228,20 +282,29 @@ export class CloudClient {
     }
     if (this.token) headers.Authorization = `Bearer ${this.token}`
     if (init.type) headers['Content-Type'] = init.type
-    try {
-      return await fetch(`${this.host}/api${path}`, {
-        method,
-        headers,
-        body: init.body,
-        signal: AbortSignal.timeout(init.timeout),
-      })
-    } catch (error) {
-      const cause = (error as { cause?: { code?: string; message?: string } }).cause
-      const reason =
-        (error as Error).name === 'TimeoutError'
-          ? 'timed out'
-          : (cause?.code ?? cause?.message ?? (error as Error).message)
-      throw new CloudError(`Could not reach ${this.host}: ${reason}`, 0, 'network')
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await fetch(`${this.host}/api${path}`, {
+          method,
+          headers,
+          body: init.body,
+          signal: AbortSignal.timeout(init.timeout),
+        })
+      } catch (error) {
+        const timedOut = (error as Error).name === 'TimeoutError'
+        const code = networkCode(error)
+        // A connection that was never made sent nothing, so any request may go again; a read, once
+        // more on any failure. A network briefly down, or a connection attempt lost on the way, passes.
+        const again = !timedOut && (NOT_CONNECTED.has(code ?? '') || method === 'GET' || method === 'HEAD')
+        if (again && attempt < CONNECT_RETRIES) {
+          await sleep(1000 * 2 ** attempt)
+          continue
+        }
+        const cause = (error as { cause?: { message?: string } }).cause
+        const reason = timedOut ? 'timed out' : (code ?? cause?.message ?? (error as Error).message)
+        const tries = attempt ? ` (tried ${attempt + 1} times)` : ''
+        throw new CloudError(`Could not reach ${this.host}: ${reason}${tries}`, 0, 'network')
+      }
     }
   }
 
@@ -309,8 +372,8 @@ export class CloudClient {
     return { owned: list(body.owned, 'owner'), shared: list(body.shared, 'member') }
   }
 
-  async createProject(name: string): Promise<RemoteProject> {
-    const body = record(await this.request('POST', '/projects', { name }))
+  async createProject(name: string, kind: ProjectKind = 'design'): Promise<RemoteProject> {
+    const body = record(await this.request('POST', '/projects', kind === 'design' ? { name } : { name, kind }))
     const project = parseProject(body.project ?? body, 'owner')
     if (!project) throw new CloudError(`${this.host} did not return the new project`, 0, 'bad_response')
     return project
@@ -406,6 +469,27 @@ export class CloudClient {
       await this.request(
         'POST',
         `/projects/${encodeURIComponent(projectId)}/canvases/${encodeURIComponent(canvas)}/screens/${encodeURIComponent(screen)}/${action}`,
+      ),
+    )
+    return { publicId: str(body.publicId) ?? null }
+  }
+
+  /** The pages of a pages project, last changed first. */
+  async pages(projectId: string): Promise<RemotePage[]> {
+    const body = record(await this.request('GET', `/projects/${encodeURIComponent(projectId)}/pages`))
+    return (Array.isArray(body.pages) ? body.pages : []).map(parsePage).filter((page): page is RemotePage => !!page)
+  }
+
+  /** Publish a page (its link stays across versions) or turn its link off (owner only). */
+  async pageAction(
+    projectId: string,
+    slug: string,
+    action: 'publish' | 'unpublish',
+  ): Promise<{ publicId: string | null }> {
+    const body = record(
+      await this.request(
+        'POST',
+        `/projects/${encodeURIComponent(projectId)}/pages/${encodeURIComponent(slug)}/${action}`,
       ),
     )
     return { publicId: str(body.publicId) ?? null }

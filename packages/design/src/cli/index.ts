@@ -11,6 +11,7 @@ import { runDrawings } from './commands/drawings'
 import { runIcon } from './commands/icon'
 import { runImport } from './commands/import'
 import { runMerge } from './commands/merge'
+import { runPage, runPages } from './commands/pages'
 import { runPreview, runPreviews, runStop, runStopAll } from './commands/preview'
 import { runRename } from './commands/rename'
 import { runInit, runNew, runSystemInit } from './commands/scaffold'
@@ -111,6 +112,14 @@ ${bold('Cloud')}  ${dim('units: system (design.json + system/) and canvas/<id>; 
                                              history kept
   unarchive <canvas>                         Bring an archived canvas back
 
+${bold('Pages')}  ${dim('HTML pages published to the cloud, each at its own link; no .design needed')}
+  page <file.html|folder> [--name <slug>]    Publish an HTML file, or a folder with an index.html and
+       [--title <title>] [--project <id>]    what it loads, as a page of your pages project (made on
+       [--public] [--json]                   first use). The same name again is a new version at the
+                                             same links. --public gives it a link anyone can open
+                                             (owner only); links to other sites open in a new tab
+  pages [--project <id>] [--json]            The pages: name, title, version, size, public link
+
 ${bold('Options')}
   --root <dir>   Project folder (default: the nearest folder with .design, or the current one)
   -h, --help     This help
@@ -176,6 +185,8 @@ async function main(argv: string[]) {
       full: { type: 'boolean' },
       tar: { type: 'boolean' },
       new: { type: 'string' },
+      project: { type: 'string' },
+      public: { type: 'boolean' },
       resolved: { type: 'string', multiple: true },
       theirs: { type: 'string', multiple: true },
       help: { type: 'boolean', short: 'h' },
@@ -290,6 +301,17 @@ async function main(argv: string[]) {
     case 'archive':
     case 'unarchive':
       return runArchive(projectPaths(values.root), rest[0], command === 'archive')
+    case 'page':
+      if (rest.length > 1) throw new CliError('Usage: design page <file.html|folder> [--name <slug>] [--public]')
+      return runPage(rest[0], {
+        name: values.name,
+        title: values.title,
+        project: values.project,
+        public: !!values.public,
+        json: !!values.json,
+      })
+    case 'pages':
+      return runPages({ project: values.project, json: !!values.json })
     case 'push':
       return runPush(projectPaths(values.root), rest, { resolved: values.resolved ?? [], json: !!values.json })
     case 'pull':

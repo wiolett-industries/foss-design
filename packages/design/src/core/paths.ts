@@ -68,6 +68,7 @@ export const PKG = {
   root: PKG_ROOT,
   manifest: path.join(PKG_ROOT, 'package.json'),
   runtime: path.join(PKG_ROOT, 'dist', 'runtime', 'index.js'),
+  pageRuntime: path.join(PKG_ROOT, 'dist', 'runtime', 'page.js'),
   baseCss: path.join(PKG_ROOT, 'dist', 'runtime', 'base.css'),
   viewer: path.join(PKG_ROOT, 'dist', 'viewer'),
   cli: path.join(PKG_ROOT, 'dist', 'cli.js'),

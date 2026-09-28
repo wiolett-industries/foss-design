@@ -26,6 +26,10 @@ function detail(paths: DesignPaths, status: UnitStatus): string {
     if (!status.baseRev && status.headRev === null) parts.push('new')
     else if (!status.local) parts.push('deleted here')
     else if (status.changed.length) parts.push(plural(status.changed.length, 'file'))
+    if (status.usesChanged.length)
+      parts.push(
+        `uses ${plural(status.usesChanged.length, 'changed file')} from outside: ${status.usesChanged.slice(0, 2).join(', ')}${status.usesChanged.length > 2 ? ', …' : ''}`,
+      )
   }
   if (status.state === 'remote_ahead' && !status.local && !status.baseRev) parts.push('not pulled yet')
   if (status.state === 'remote_ahead' && status.changed.length && !status.deletedRemotely)
@@ -82,7 +86,7 @@ export async function printCloudStatus(paths: DesignPaths, label: (text: string)
 
   const scan = scanLocal(paths)
   const statuses = allUnitKeys(link, scan.units, remote).map((key) =>
-    unitStatus(key, link, scan.units.get(key)?.manifest, remote),
+    unitStatus(key, link, scan.units.get(key)?.manifest, remote, paths.design),
   )
   if (!statuses.length) print(`${label('Units')}${dim('none yet')}`)
   else {

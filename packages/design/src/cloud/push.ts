@@ -3,9 +3,10 @@ import path from 'node:path'
 import { mapLimit } from '../capture/frames'
 import { CliError } from '../cli/log'
 import { canvasCodeFiles, GO_REMOVED, legacyGoLines } from '../core/canvas'
-import { relToRoot } from '../core/paths'
+import { isInside, relToRoot } from '../core/paths'
 import { DesignProject } from '../core/project'
 import { STATIC_URLS } from '../core/sources'
+import { toPosix } from '../core/text'
 import { CloudError, type PushUnit, type RemoteUnit } from './client'
 import { finishMerge, readMergeState } from './merge'
 import { syncProjectMeta } from './meta'
@@ -29,11 +30,13 @@ import {
   buildManifest,
   buildUnit,
   caseClashes,
+  hashFile,
   type Manifest,
   SYSTEM_UNIT,
   scanLocal,
   unitBuildDir,
   unitCanvasId,
+  unitRoot,
 } from './units'
 
 function blockedReport(status: UnitStatus, message: string): UnitReport {
@@ -96,7 +99,7 @@ export async function push(
     link.units[key] = { rev: head, files: link.units[key]?.files ?? {} }
     delete link.conflicts[key]
   }
-  const status = (key: string) => unitStatus(key, link, scan.units.get(key)?.manifest, remote)
+  const status = (key: string) => unitStatus(key, link, scan.units.get(key)?.manifest, remote, paths.design)
 
   for (const key of selected) {
     if (!scan.units.has(key) && !remote.has(key) && !link.units[key]) {
@@ -119,7 +122,7 @@ export async function push(
     candidates = [...resolved]
     for (const key of scan.units.keys()) {
       const s = status(key)
-      if (s.changed.length || s.conflictRev !== undefined) candidates.push(key)
+      if (s.changed.length || s.usesChanged.length || s.conflictRev !== undefined) candidates.push(key)
     }
     candidates = unique(candidates)
   }
@@ -228,7 +231,8 @@ export async function push(
   // Unchanged units are left alone, unless a system push rebuilds them or a merge is being resolved.
   const pushing = toPush.filter((key) => {
     const s = status(key)
-    if (systemPush || resolved.includes(key) || s.changed.length || !remote.has(key)) return true
+    if (systemPush || resolved.includes(key) || s.changed.length || s.usesChanged.length || !remote.has(key))
+      return true
     report.units.push({ unit: key, action: 'unchanged', rev: s.baseRev, url: webUrl(link, key) })
     return false
   })
@@ -239,6 +243,7 @@ export async function push(
   const project = new DesignProject(paths, STATIC_URLS)
   const systemRev = remote.get(SYSTEM_UNIT)?.headRev ?? 0
   const units: PushUnit[] = []
+  const deps = new Map<string, Record<string, string>>()
   const files = new Map<string, string>()
   const addFiles = (manifest: Manifest, dir: string) => {
     for (const [rel, entry] of Object.entries(manifest))
@@ -259,6 +264,12 @@ export async function push(
       )
     const source = scan.units.get(key)!.manifest
     const build = buildManifest(unitBuildDir(paths, key))
+    deps.set(key, borrowedFiles(paths, key, result.modules))
+    const uses = status(key).usesChanged
+    if (uses.length && !status(key).changed.length)
+      report.hints.push(
+        `${key} is pushed for files it uses from outside its folder: ${uses.slice(0, 3).join(', ')}${uses.length > 3 ? ` and ${uses.length - 3} more` : ''}`,
+      )
     addFiles(source, paths.design)
     addFiles(build, unitBuildDir(paths, key))
     units.push({
@@ -318,7 +329,12 @@ export async function push(
   }
   for (const unit of units) {
     const rev = revs.get(unit.key) ?? unit.baseRev + 1
-    link.units[unit.key] = { rev, files: hashes(unit.source) }
+    const used = deps.get(unit.key)
+    link.units[unit.key] = {
+      rev,
+      files: hashes(unit.source),
+      ...(used && Object.keys(used).length ? { deps: used } : {}),
+    }
     report.units.push({
       unit: unit.key,
       action: unit.baseRev ? 'pushed' : 'created',
@@ -331,6 +347,24 @@ export async function push(
   writeLink(paths, link)
   report.units.sort((a, b) => byUnit(a.unit, b.unit))
   return report
+}
+
+/**
+ * The files a unit's build took from outside the unit (another canvas's screen, a module shared in
+ * `.design`, the app's source through an alias), relative to `.design`, with their sha256. The
+ * system unit's files are left out: a system change pushes every canvas anyway.
+ */
+function borrowedFiles(paths: SyncContext['paths'], key: string, modules: string[]): Record<string, string> {
+  const own = [unitRoot(paths, key), paths.system, paths.config]
+  const out: Record<string, string> = {}
+  for (const rel of modules) {
+    const file = path.join(paths.root, rel)
+    if (own.some((dir) => file === dir || isInside(dir, file)) || isInside(paths.cache, file)) continue
+    try {
+      out[toPosix(path.relative(paths.design, file))] = hashFile(file).hash
+    } catch {}
+  }
+  return out
 }
 
 /** Screens still calling the removed `go()` stop the push before anything is built. */

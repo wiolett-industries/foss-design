@@ -30,4 +30,16 @@ export default defineConfig([
       fs.copyFileSync('src/runtime/base.css', 'dist/runtime/base.css')
     },
   },
+  {
+    // Inlined by `design page` into the HTML files of a page: one small script, no imports.
+    entry: { 'runtime/page': 'src/runtime/page.ts' },
+    format: 'iife',
+    platform: 'browser',
+    target: 'es2020',
+    outDir: 'dist',
+    clean: false,
+    splitting: false,
+    minify: true,
+    outExtension: () => ({ js: '.js' }),
+  },
 ])
