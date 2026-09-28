@@ -1,10 +1,11 @@
 import { serveBuild } from '../../capture/build-server'
 import { type FrameReport, launchChrome, openFrame } from '../../capture/chrome'
 import { canvasFrames, type FrameJob, mapLimit, systemFrames } from '../../capture/frames'
-import type { DesignPaths } from '../../core/paths'
+import { type DesignPaths, relToRoot } from '../../core/paths'
 import { DesignProject } from '../../core/project'
 import { DEV_URLS } from '../../core/sources'
 import { liveServer } from '../../server/state'
+import { appPlugins } from '../../server/vite'
 import { compileRoute, linkPath, matchRoute } from '../../shared/routes'
 import type { CanvasDoc, Issue, SystemDoc } from '../../shared/types'
 import { bold, CliError, dim, green, print, red, yellow } from '../log'
@@ -127,6 +128,9 @@ export async function runCheck(
   }
 
   const issues = canvases.length ? canvases.flatMap((id) => project.canvas(id)?.doc.issues ?? []) : project.issues()
+  // design.json `vitePlugins` names plugins of the app's Vite config; one it lacks is only a warning.
+  for (const message of (await appPlugins(project, 'serve')).problems)
+    issues.push({ severity: 'warning', file: relToRoot(paths, paths.config), message })
 
   let frames: FrameResult[] = []
   if (options.render) {

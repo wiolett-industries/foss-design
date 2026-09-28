@@ -11,6 +11,8 @@ export interface ServerState {
   root: string
   version: string
   startedAt: string
+  /** `installStamp` when it started: the app's packages it pre-bundled (0.9.16+). */
+  deps?: string
 }
 
 const stateFile = (paths: DesignPaths) => path.join(paths.cache, 'server.json')

@@ -18,7 +18,7 @@ import { type FrameHead, injectIntoHtml, moduleShell, optsOutOfSystem } from './
 import { linkShippedPackages } from './links'
 import { SnapshotStore } from './snapshots'
 import { clearState, writeState } from './state'
-import { baseConfig, dropStaleDepCache } from './vite'
+import { appPlugins, baseConfig, dropStaleDepCache, installStamp } from './vite'
 
 /** 0: any free port, so previews of several projects run side by side. */
 export const DEFAULT_PORT = 0
@@ -90,7 +90,10 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
   const listening = () => (httpServer.address() as { port: number } | null)?.port ?? 0
 
   dropStaleDepCache(paths, project.appDir())
-  const base = baseConfig(project)
+  const deps = installStamp(paths, project.appDir())
+  const fromApp = await appPlugins(project, 'serve')
+  for (const problem of fromApp.problems) console.warn(`warning: ${problem}`)
+  const base = baseConfig(project, fromApp.plugins)
   const vite: ViteDevServer = await createServer({
     ...base,
     base: '/_fs/',
@@ -291,6 +294,22 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
       }
     }, 60)
   }
+  // Tailwind scans its sources again only when the system stylesheet is built again, and a file
+  // nothing imports yet (a new screen, a new component of the app) changes nothing that stylesheet
+  // depends on: every file added to what it scans rebuilds it, in open frames too.
+  const scanned = entries.scannedDirs()
+  vite.watcher.add(scanned.filter((dir) => !isInside(paths.design, dir)))
+  let cssTimer: ReturnType<typeof setTimeout> | undefined
+  const rebuildCss = () => {
+    clearTimeout(cssTimer)
+    cssTimer = setTimeout(() => {
+      for (const mod of vite.moduleGraph.getModulesByFile(entries.systemCssFile()) ?? []) void vite.reloadModule(mod)
+    }, 80)
+  }
+  vite.watcher.on('add', (file) => {
+    if (file.split(path.sep).includes('node_modules') || isInside(paths.cache, file)) return
+    if (scanned.some((dir) => isInside(dir, file))) rebuildCss()
+  })
   vite.watcher.on('all', (event, file) => {
     if (publicDir && isInside(publicDir, file)) project.invalidatePublic()
     const rel = toPosix(path.relative(paths.design, file))
@@ -334,6 +353,7 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
       root: paths.root,
       version: packageVersion(),
       startedAt: new Date().toISOString(),
+      deps,
     })
   }
 

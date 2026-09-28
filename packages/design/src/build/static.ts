@@ -11,7 +11,7 @@ import { toPosix } from '../core/text'
 import { Entries, HTML_BOOT } from '../server/entries'
 import { type FrameHead, injectIntoHtml, moduleShell, optsOutOfSystem } from '../server/html'
 import { linkShippedPackages } from '../server/links'
-import { baseConfig } from '../server/vite'
+import { appPlugins, baseConfig } from '../server/vite'
 import type { Theme } from '../shared/types'
 
 export interface SiteResult {
@@ -22,6 +22,8 @@ export interface SiteResult {
   errors: number
   /** The copied viewer references assets by absolute path, so the site only works at the root of a host. */
   absoluteAssets: boolean
+  /** The project's source files bundled into the site, relative to the project root (packages left out). */
+  modules: string[]
 }
 
 export interface BuildOptions {
@@ -201,26 +203,26 @@ export async function buildSite(paths: DesignPaths, out: string, options: BuildO
   fs.mkdirSync(out, { recursive: true })
   const moduleMap: ModuleMap = {}
   if (inputs.length) {
-    const base = baseConfig(project)
+    const fromApp = await appPlugins(project, 'build')
+    for (const problem of fromApp.problems) process.stderr.write(`warning: ${problem}\n`)
+    const base = baseConfig(project, fromApp.plugins)
     await build({
       ...base,
       plugins: [
         ...(base.plugins ?? []),
-        options.moduleMap
-          ? {
-              name: 'design-module-map',
-              generateBundle(_: unknown, bundle: Record<string, { type: string; moduleIds?: string[] }>) {
-                for (const [file, chunk] of Object.entries(bundle)) {
-                  if (chunk.type !== 'chunk') continue
-                  moduleMap[file] = (chunk.moduleIds ?? [])
-                    .map((id) => id.split('?')[0]!)
-                    .filter((id) => path.isAbsolute(id) && !id.includes(`${path.sep}node_modules${path.sep}`))
-                    .map((id) => toPosix(path.relative(paths.root, id)))
-                    .filter((rel) => !rel.startsWith('..'))
-                }
-              },
+        {
+          name: 'design-module-map',
+          generateBundle(_: unknown, bundle: Record<string, { type: string; moduleIds?: string[] }>) {
+            for (const [file, chunk] of Object.entries(bundle)) {
+              if (chunk.type !== 'chunk') continue
+              moduleMap[file] = (chunk.moduleIds ?? [])
+                .map((id) => id.split('?')[0]!)
+                .filter((id) => path.isAbsolute(id) && !id.includes(`${path.sep}node_modules${path.sep}`))
+                .map((id) => toPosix(path.relative(paths.root, id)))
+                .filter((rel) => !rel.startsWith('..'))
             }
-          : null,
+          },
+        },
       ],
       root: staging,
       base: './',
@@ -318,7 +320,8 @@ export async function buildSite(paths: DesignPaths, out: string, options: BuildO
       fs.copyFileSync(path.join(publicDir, rel), to)
     }
   }
-  return { out, canvases: canvasIds, frames: inputs.length, errors, absoluteAssets }
+  const modules = [...new Set(Object.values(moduleMap).flat())].sort()
+  return { out, canvases: canvasIds, frames: inputs.length, errors, absoluteAssets, modules }
 }
 
 /** Copy the built viewer into the site and switch it to static mode. */

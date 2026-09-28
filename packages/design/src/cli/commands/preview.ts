@@ -14,6 +14,7 @@ import {
   type ServerState,
   stopPreview,
 } from '../../server/state'
+import { installStamp } from '../../server/vite'
 import { bold, CliError, dim, print } from '../log'
 
 export function openBrowser(url: string) {
@@ -75,9 +76,13 @@ export async function ensureServer(
   const live = await liveServer(paths)
   // A server left running by another foss-design version would serve its old viewer and runtime.
   const stale = live && live.version !== packageVersion()
-  if (live && !options.restart && !stale) return live
+  // One started before the app's packages were installed again serves the old pre-bundled copies.
+  const installed =
+    live?.deps !== undefined && live.deps !== installStamp(paths, new DesignProject(paths, DEV_URLS).appDir())
+  if (live && !options.restart && !stale && !installed) return live
   if (stale)
     print(dim(`Restarting the preview server: it runs foss-design ${live.version}, this is ${packageVersion()}.`))
+  else if (installed) print(dim("Restarting the preview server: the app's packages changed since it started."))
   if (live) await stopServer(paths)
   // Any other server still running for this project goes too: one busy past the health check
   // (a big canvas loading) would otherwise keep running untracked once server.json names the new one.
