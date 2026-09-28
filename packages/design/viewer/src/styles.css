@@ -471,8 +471,21 @@
   will-change: transform;
 }
 
-.canvas-world.far .canvas-section {
+.canvas-world.far .canvas-section,
+.canvas-world.small-titles .canvas-section {
   visibility: hidden;
+}
+
+/* Section titles in screen space, in the gap above the section (the header below it is only a few
+   pixels tall by then): shown only while the canvas ones are too small (data-titles). */
+.canvas-overlay .section-title {
+  display: none;
+  translate: 0 -100%;
+  padding-bottom: 8px;
+}
+
+.canvas-overlay[data-titles="on"] .section-title {
+  display: block;
 }
 
 /* While the canvas pans, frames must not swallow the pointer. */

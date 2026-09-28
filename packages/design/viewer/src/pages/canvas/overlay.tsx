@@ -3,7 +3,7 @@ import { type CSSProperties, memo, useMemo } from 'react'
 import { cn } from '../../lib/cn'
 import { useStore } from '../../lib/store'
 import { intersects, type Rect } from './camera'
-import { isFrame, type Layout, type Placed } from './layout'
+import { isFrame, type Layout, type Placed, type PlacedSection } from './layout'
 import type { ViewStore } from './view-state'
 
 const at = (placed: Placed): CSSProperties =>
@@ -38,6 +38,19 @@ const Label = memo(function Label({ placed, store }: { placed: Placed; store: Vi
       <span className="frame-device min-w-0 shrink-[20] truncate text-[11.5px] text-muted opacity-80">
         {deviceLabel(placed)}
       </span>
+    </div>
+  )
+})
+
+/** A section's title in screen space, for zooms where the one on the canvas is too small to read. */
+const SectionTitle = memo(function SectionTitle({ placed }: { placed: PlacedSection }) {
+  return (
+    <div
+      data-at=""
+      style={{ '--x': placed.x, '--y': placed.y } as CSSProperties}
+      className="section-title text-[15px] leading-none font-semibold whitespace-nowrap text-ink select-none"
+    >
+      {placed.section.title}
     </div>
   )
 })
@@ -83,11 +96,15 @@ export function Overlay({
     const area: Rect = { x: -x / z - w / z, y: -y / z - h / z, w: (w / z) * 3, h: (h / z) * 3 }
     return frames.filter((placed) => intersects(placed, area))
   }, [frames, view, tiny])
+  const titled = useMemo(() => layout.sections.filter((placed) => placed.section.title), [layout])
   const find = (id: string | null) => (id ? layout.items.find((placed) => placed.item.id === id) : undefined)
   const selectedPlaced = find(selected)
   const hoveredPlaced = hovered && hovered !== selected ? find(hovered) : undefined
   return (
     <div ref={overlayRef} className="canvas-overlay" data-tiny={tiny}>
+      {titled.map((placed) => (
+        <SectionTitle key={placed.section.id} placed={placed} />
+      ))}
       {near.map((placed) => (
         <Label key={placed.item.id} placed={placed} store={store} />
       ))}

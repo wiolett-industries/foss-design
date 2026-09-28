@@ -10,6 +10,8 @@ import type { ViewStore } from './view-state'
 
 /** Frames rendered live at once; the rest show snapshots. */
 const MAX_LIVE = 12
+/** Below this zoom a section's 40px title is under 16px on screen. */
+const SMALL_TITLE_ZOOM = 0.4
 /** Live frames kept mounted (asleep) after they scroll away, so coming back does not reload them. */
 const MAX_KEEP = 20
 /** A frame narrower than this on screen stays a snapshot. */
@@ -116,6 +118,10 @@ export function Viewport({ layout, theme, store, camera, events, capture, apiRef
       if (store.get().zoomTiny !== tiny) store.set((state) => ({ ...state, zoomTiny: tiny }))
       // Far out, section titles are a few pixels tall and run into the frame labels.
       world.classList.toggle('far', c.z < 0.15)
+      // Section titles smaller than about 16px on screen give way to the overlay's, which keep that size.
+      const smallTitles = c.z < SMALL_TITLE_ZOOM
+      world.classList.toggle('small-titles', smallTitles)
+      if (overlay) overlay.dataset.titles = smallTitles ? 'on' : 'off'
       viewTimer ??= setTimeout(() => {
         viewTimer = undefined
         publishView()
