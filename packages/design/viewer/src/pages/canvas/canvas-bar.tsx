@@ -231,33 +231,54 @@ function SelectedBar({
       transition={{ type: 'spring', duration: 0.26, bounce: 0.12 }}
       className="relative flex w-fit max-w-full min-w-0 flex-col"
     >
-      {/* While Inspect is on (or ⌘/Ctrl held), a tab slides out from behind the bar's top edge to say
-            how it works: as wide as its text, 20px short of the bar's ends at most; the bar's border
-            stays under it. */}
-      <div className="pointer-events-none absolute inset-x-5 bottom-full flex justify-center">
-        <AnimatePresence>
+      {/* Tabs slide out from behind the bar's top edge, each as wide as its text and 20px short of
+            the bar's ends at most, the bar's border staying under them: the frame's error, first
+            line only (all of them on hover), and while Inspect is on (or ⌘/Ctrl held) how it works.
+            Both at once stack, the error on the bar. */}
+      <div className="pointer-events-none absolute inset-x-5 bottom-full flex flex-col items-center">
+        <AnimatePresence initial={false}>
           {frame && inspect ? (
             <motion.div
               key="inspect"
+              layout="position"
               initial={{ y: '100%', opacity: 0 }}
               animate={{ y: 0, opacity: 0.9 }}
               exit={{ y: '100%', opacity: 0 }}
               transition={{ type: 'spring', duration: 0.28, bounce: 0.15 }}
-              className="flex h-[22px] min-w-0 items-center rounded-t-[7px] border border-b-0 border-rule bg-surface/80 px-3 text-[11.5px] whitespace-nowrap text-muted backdrop-blur-md"
+              className="flex h-[22px] max-w-full min-w-0 items-center rounded-t-[7px] border border-b-0 border-rule bg-surface/80 px-3 text-[11.5px] whitespace-nowrap text-muted backdrop-blur-md"
             >
               <span className="truncate">Click an element to inspect it</span>
             </motion.div>
           ) : null}
+          {errors.length ? (
+            <motion.div
+              key="error"
+              layout="position"
+              initial={{ y: '100%', opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: '100%', opacity: 0 }}
+              transition={{ type: 'spring', duration: 0.28, bounce: 0.15 }}
+              className="pointer-events-auto flex max-w-full min-w-0"
+            >
+              <Tooltip
+                content={
+                  <span className="block max-h-60 max-w-[560px] overflow-y-auto font-mono text-[11.5px] whitespace-pre-wrap">
+                    {errors.join('\n\n')}
+                  </span>
+                }
+              >
+                <div className="flex h-[22px] min-w-0 items-center gap-1.5 rounded-t-[7px] border border-b-0 border-danger/25 bg-danger-soft px-2.5 font-mono text-[11px] whitespace-nowrap text-danger-text">
+                  <Icon name="alert" size={12} className="shrink-0" />
+                  <span className="truncate">{errors[0]!.split('\n')[0]}</span>
+                  {errors.length > 1 ? <span className="shrink-0 opacity-70">+{errors.length - 1}</span> : null}
+                </div>
+              </Tooltip>
+            </motion.div>
+          ) : null}
         </AnimatePresence>
       </div>
-      {/* Positioned, so it paints over the tab, which slides out from under it. */}
+      {/* Positioned, so it paints over the tabs, which slide out from under it. */}
       <div className="pointer-events-auto relative flex max-w-full flex-col overflow-hidden rounded-[10px] border border-rule bg-surface shadow-pop">
-        {errors.length ? (
-          <div className="flex max-h-40 items-start gap-2 overflow-y-auto border-b border-rule bg-danger-soft px-3.5 py-2 font-mono text-[12px] whitespace-pre-wrap text-danger-text">
-            <Icon name="alert" size={14} className="mt-px" />
-            <span className="min-w-0">{errors.join('\n')}</span>
-          </div>
-        ) : null}
         <div className="flex h-[44px] items-center gap-1 pr-1.5 pl-3.5 [&>:not(:first-child)]:shrink-0">
           <span className="min-w-0 truncate pr-2 text-[13.5px] font-medium">{item.title || item.id}</span>
           {frame ? (

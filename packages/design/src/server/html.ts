@@ -35,7 +35,8 @@ function headTags(head: FrameHead): string {
   const theme =
     `(function(){var q=new URLSearchParams(location.search).get('theme');` +
     `var t=${JSON.stringify(source.theme ?? null)}||(q==='dark'||q==='light'?q:${JSON.stringify(fallback)});` +
-    `var r=document.documentElement;r.dataset.theme=t;r.classList.toggle('dark',t==='dark');r.style.colorScheme=t})()`
+    `var r=document.documentElement;r.dataset.theme=r.dataset.mode=r.dataset.colorScheme=t;` +
+    `r.classList.toggle('dark',t==='dark');r.classList.toggle('theme-dark',t==='dark');r.style.colorScheme=t})()`
   const tags = [`<script>window.__DESIGN__=${scriptJson(config)};${theme}</script>`, '<link rel="icon" href="data:,">']
   for (const href of head.fonts) tags.push(`<link rel="stylesheet" href="${escapeHtml(href)}">`)
   if (head.systemCss) tags.push(`<link rel="stylesheet" href="${escapeHtml(head.systemCss)}">`)

@@ -1,5 +1,6 @@
 import type { SystemDoc, Token } from '@shared/types'
 import type { ReactNode } from 'react'
+import { cn } from '../../lib/cn'
 import { copyText } from '../../lib/copy'
 import { useTheme } from '../../lib/theme'
 import { PageHead } from '../../ui/page'
@@ -11,15 +12,22 @@ const MULTIPLES = [1, 2, 3, 4, 6, 8, 12, 16]
 const BAR_MAX = 480
 
 function Bar({ px }: { px: number | null }) {
-  if (px === null) return <span className="text-[12.5px] text-muted">not a plain length</span>
+  if (px === null) return <span className="text-[12px] text-muted">not a plain length, so no bar</span>
+  const capped = px > BAR_MAX
   return (
-    <span className="flex h-3 items-center">
-      <span
-        className="h-3 rounded-[3px] bg-action/70"
-        style={{ width: Math.max(2, Math.min(px, BAR_MAX)) }}
-        title={`${px}px`}
-      />
-      {px > BAR_MAX ? <span className="ml-1.5 text-[12px] text-muted">…</span> : null}
+    <span
+      className={cn('block h-3 rounded-[3px] bg-action/70', capped && 'mask-r-from-80%')}
+      style={{ width: Math.max(2, Math.min(px, BAR_MAX)) }}
+      title={`${px}px`}
+    />
+  )
+}
+
+/** A token's value: on one line when it is short, wrapped at its spaces when it is an expression. */
+function TokenValue({ value }: { value: string | undefined }) {
+  return (
+    <span className="min-w-0 font-mono text-[12px] leading-snug text-muted [overflow-wrap:anywhere]" title={value}>
+      {value}
     </span>
   )
 }
@@ -28,7 +36,7 @@ function Spacing({ tokens }: { tokens: Token[] }) {
   const base = tokens.find((token) => token.name === '--spacing')
   const named = tokens.filter((token) => token !== base)
   const basePx = base?.light ? toPx(base.light.value) : null
-  const cols = 'minmax(150px,0.8fr) 110px minmax(0,2fr)'
+  const cols = 'minmax(150px,0.8fr) minmax(0,160px) minmax(0,2fr)'
   return (
     <Panel>
       <PanelHead title="Spacing" count={tokens.length} sub={base ? `base ${base.light?.value}` : undefined} />
@@ -61,9 +69,7 @@ function Spacing({ tokens }: { tokens: Token[] }) {
             </Mono>
             {token.description ? <span className="truncate text-[12.5px] text-muted">{token.description}</span> : null}
           </span>
-          <Mono size={12} className="text-muted">
-            {token.light?.value}
-          </Mono>
+          <TokenValue value={token.light?.value} />
           <Bar px={token.light ? toPx(token.light.value) : null} />
         </Row>
       ))}

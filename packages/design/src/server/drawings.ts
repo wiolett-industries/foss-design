@@ -72,6 +72,8 @@ class Room {
   private cloud: CloudRelay | null = null
   private written: string | null = null
   private saveTimer: ReturnType<typeof setTimeout> | undefined
+  /** A change not on disk yet: only such a change is written, so looking at a canvas writes nothing. */
+  private dirty = false
   private idleTimer: ReturnType<typeof setTimeout> | undefined
 
   constructor(
@@ -209,12 +211,15 @@ class Room {
   }
 
   private save() {
+    this.dirty = true
     clearTimeout(this.saveTimer)
     this.saveTimer = setTimeout(() => this.flush(), 150)
   }
 
   flush() {
     clearTimeout(this.saveTimer)
+    if (!this.dirty) return
+    this.dirty = false
     const dir = path.dirname(this.file)
     if (!fs.existsSync(dir)) return
     const drawings = Object.fromEntries(

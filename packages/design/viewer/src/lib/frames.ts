@@ -139,7 +139,7 @@ export function followLink(
   missing?: (path: string) => void,
 ) {
   if (message.form) {
-    toast('Forms are not sent from a screen', undefined, 'info')
+    toast('Forms are not sent from here', undefined, 'info')
     return
   }
   if (message.path === null) {

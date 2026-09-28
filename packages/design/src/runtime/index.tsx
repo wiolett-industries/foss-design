@@ -58,12 +58,94 @@ servePublicFolder(config.public)
 let theme: Theme = config.theme ?? (query.get('theme') === 'dark' ? 'dark' : 'light')
 const themeListeners = new Set<() => void>()
 
+/**
+ * A frame's `prefers-color-scheme` is the system's, whatever theme the viewer shows it in, so a
+ * screen whose dark mode is a media query (Tailwind's default `dark:`, `@media (prefers-color-scheme:
+ * dark)` in the app's tokens, `matchMedia` in a theme provider) would ignore the viewer's switch. In
+ * a frame the viewer's theme stands in for the system's: those queries answer by it.
+ */
+const SCHEME = /\(\s*prefers-color-scheme\s*:\s*(dark|light)\s*\)/gi
+const hasScheme = (text: string) => /prefers-color-scheme/i.test(text)
+const themed = (text: string) =>
+  text.replace(SCHEME, (_, wanted: string) =>
+    wanted.toLowerCase() === theme ? '(min-width: 0px)' : '(max-width: 0px)',
+  )
+
+/** Media lists as the stylesheet wrote them, before they were made to answer by the theme. */
+const writtenMedia = new WeakMap<MediaList, string>()
+
+function themeMediaList(media: MediaList) {
+  const written = writtenMedia.get(media) ?? media.mediaText
+  if (!hasScheme(written)) return
+  writtenMedia.set(media, written)
+  const next = themed(written)
+  if (media.mediaText !== next) media.mediaText = next
+}
+
+function themeRules(rules: CSSRuleList) {
+  for (const rule of Array.from(rules)) {
+    if (rule instanceof CSSMediaRule) themeMediaList(rule.media)
+    const inner = (rule as CSSGroupingRule).cssRules
+    if (inner?.length) themeRules(inner)
+  }
+}
+
+/** Every stylesheet's colour-scheme queries, answered by the theme. */
+function themeStylesheets() {
+  for (const sheet of Array.from(document.styleSheets)) {
+    try {
+      themeMediaList(sheet.media)
+      themeRules(sheet.cssRules)
+    } catch {}
+  }
+}
+
+const nativeMatchMedia = window.matchMedia.bind(window)
+const schemeQueries = new Set<ThemeQuery>()
+
+/** `matchMedia` for a colour-scheme query: matches by the theme, and changes with it. */
+class ThemeQuery extends EventTarget {
+  onchange: ((this: MediaQueryList, event: MediaQueryListEvent) => unknown) | null = null
+  private last: boolean
+  constructor(readonly media: string) {
+    super()
+    this.last = this.matches
+    schemeQueries.add(this)
+  }
+  get matches() {
+    return nativeMatchMedia(themed(this.media)).matches
+  }
+  addListener(listener: ((event: MediaQueryListEvent) => void) | null) {
+    if (listener) this.addEventListener('change', listener as EventListener)
+  }
+  removeListener(listener: ((event: MediaQueryListEvent) => void) | null) {
+    if (listener) this.removeEventListener('change', listener as EventListener)
+  }
+  update() {
+    const matches = this.matches
+    if (matches === this.last) return
+    this.last = matches
+    const event = new MediaQueryListEvent('change', { matches, media: this.media })
+    this.onchange?.call(this as unknown as MediaQueryList, event)
+    this.dispatchEvent(event)
+  }
+}
+
+window.matchMedia = (query: string) =>
+  hasScheme(query) ? (new ThemeQuery(query) as unknown as MediaQueryList) : nativeMatchMedia(query)
+
 function applyTheme(next: Theme) {
   theme = next
   const root = document.documentElement
+  // Every form the style guide reads as dark (system.ts), so the app's own one switches too.
   root.dataset.theme = next
+  root.dataset.mode = next
+  root.dataset.colorScheme = next
   root.classList.toggle('dark', next === 'dark')
+  root.classList.toggle('theme-dark', next === 'dark')
   root.style.colorScheme = next
+  themeStylesheets()
+  for (const query of schemeQueries) query.update()
   for (const listener of themeListeners) listener()
 }
 
@@ -104,20 +186,172 @@ export function useScreen(): { canvas: string; id: string; props: Record<string,
   return { canvas: config.canvas, id: config.id, props: config.props }
 }
 
+const px = (value: string) => Number.parseFloat(value) || 0
+
+/**
+ * Boxes whose height follows what holds them rather than what is in them: `#root` at
+ * `height: 100%`, a `min-h-screen` shell, a `flex-1` column in one. Their bottom is the frame's
+ * whatever they hold, so the frame would keep the height it started with; the content inside
+ * them is measured instead. Worked out once per box and its classes and style.
+ */
+const follows = new WeakMap<Element, { key: string; value: boolean }>()
+const styleKey = (el: Element) => `${el.getAttribute('class') ?? ''}|${el.getAttribute('style') ?? ''}`
+/** The following boxes of the last measure: their children are watched for size, as they keep theirs. */
+let stretched: Element[] = []
+
+function measured(el: Element): boolean {
+  if (el instanceof HTMLScriptElement || el instanceof HTMLStyleElement || el instanceof HTMLLinkElement) return false
+  const style = getComputedStyle(el)
+  return style.display !== 'none' && style.display !== 'contents' && style.position !== 'fixed'
+}
+
+const VIEWPORT_UNIT = /\d(?:[dsl]?vh|vb)\b/
+
+/** Whether a rule this frame can read gives `el` a height in viewport units (`h-screen`, `100dvh`). */
+function viewportHeight(el: Element): boolean {
+  if (el instanceof HTMLElement && VIEWPORT_UNIT.test(`${el.style.height} ${el.style.minHeight}`)) return true
+  const walk = (rules: CSSRuleList): boolean => {
+    for (const rule of Array.from(rules)) {
+      if (rule instanceof CSSStyleRule) {
+        const s = rule.style
+        if (VIEWPORT_UNIT.test(`${s.height} ${s.minHeight} ${s.blockSize} ${s.minBlockSize}`)) {
+          try {
+            if (el.matches(rule.selectorText)) return true
+          } catch {}
+        }
+      }
+      const inner = (rule as CSSGroupingRule).cssRules
+      if (inner?.length && walk(inner)) return true
+    }
+    return false
+  }
+  for (const sheet of Array.from(document.styleSheets)) {
+    let rules: CSSRuleList
+    try {
+      rules = sheet.cssRules
+    } catch {
+      continue
+    }
+    if (walk(rules)) return true
+  }
+  return false
+}
+
+const GROWN = ['transition', 'height', 'min-height', 'max-height'] as const
+
+/**
+ * Makes `boxes` `height` px tall for a moment and gives back the undo, which puts their style back
+ * with transitions still off, so nothing animates between the two.
+ */
+function grow(boxes: HTMLElement[], height: number): () => void {
+  const saved = boxes.map((el) => ({
+    had: el.hasAttribute('style'),
+    values: GROWN.map((name) => [el.style.getPropertyValue(name), el.style.getPropertyPriority(name)] as const),
+  }))
+  for (const el of boxes) {
+    el.style.setProperty('transition', 'none', 'important')
+    el.style.setProperty('height', `${height}px`, 'important')
+    el.style.setProperty('min-height', `${height}px`, 'important')
+    el.style.setProperty('max-height', 'none', 'important')
+  }
+  const put = (el: HTMLElement, index: number, at: number) => {
+    const [value, priority] = saved[index]!.values[at]!
+    if (value) el.style.setProperty(GROWN[at]!, value, priority)
+    else el.style.removeProperty(GROWN[at]!)
+  }
+  return () => {
+    boxes.forEach((el, index) => {
+      for (let at = 1; at < GROWN.length; at++) put(el, index, at)
+    })
+    void document.documentElement.offsetHeight
+    boxes.forEach((el, index) => {
+      put(el, index, 0)
+      if (!saved[index]!.had && el.getAttribute('style') === '') el.removeAttribute('style')
+    })
+  }
+}
+
+/**
+ * Which of `boxes`, each as tall as the room `holders` give it, follow that room: they grow when
+ * the holders are made taller for a moment, or take their height from the viewport.
+ */
+function decide(holders: HTMLElement[], boxes: Element[]) {
+  const open = boxes.filter((el) => follows.get(el)?.key !== styleKey(el))
+  if (!open.length) return
+  const keys = open.map(styleKey)
+  const before = open.map((el) => el.getBoundingClientRect().height)
+  const tallest = Math.max(window.innerHeight, ...holders.map((el) => el.getBoundingClientRect().height))
+  const undo = grow(holders, tallest + 997)
+  const after = open.map((el) => el.getBoundingClientRect().height)
+  undo()
+  open.forEach((el, index) => {
+    const grew = after[index]! - before[index]! > 1
+    const value = grew || Math.abs(px(getComputedStyle(el).minHeight) - window.innerHeight) < 1 || viewportHeight(el)
+    follows.set(el, { key: keys[index]!, value })
+  })
+}
+
+/** Children of `el` as tall as `room`: the ones that may follow it. */
+const filling = (el: Element, room: number) =>
+  Array.from(el.children).filter(
+    (child) => measured(child) && Math.abs(child.getBoundingClientRect().height - room) < 1,
+  )
+
+/**
+ * Where the content of `el` ends, in page coordinates: its bottom margin edge, or, for a box that
+ * follows the `room` it fills, where it would end holding just its content (the content's own
+ * height plus padding and border, wherever the content sits inside it).
+ */
+function contentBottom(el: Element, room: number, depth: number): number {
+  const style = getComputedStyle(el)
+  const rect = el.getBoundingClientRect()
+  const margin = px(style.marginBottom)
+  const top = rect.top + window.scrollY
+  const stretch = depth < 8 && Math.abs(rect.height - room) < 1 && follows.get(el)?.value === true
+  if (!stretch || !(el instanceof HTMLElement)) return top + rect.height + margin
+  stretched.push(el)
+  const edgeTop = px(style.borderTopWidth) + px(style.paddingTop)
+  const edgeBottom = px(style.borderBottomWidth) + px(style.paddingBottom)
+  const space = rect.height - edgeTop - edgeBottom
+  decide([el], filling(el, space))
+  const contentTop = top + edgeTop
+  let first = Number.POSITIVE_INFINITY
+  let last = Number.NEGATIVE_INFINITY
+  for (const node of Array.from(el.childNodes)) {
+    let from: number
+    let to: number
+    if (node instanceof Element) {
+      if (!measured(node)) continue
+      from = node.getBoundingClientRect().top + window.scrollY - px(getComputedStyle(node).marginTop)
+      to = contentBottom(node, space, depth + 1)
+    } else if (node.nodeType === Node.TEXT_NODE && node.textContent?.trim()) {
+      const range = document.createRange()
+      range.selectNode(node)
+      const box = range.getBoundingClientRect()
+      from = box.top + window.scrollY
+      to = box.bottom + window.scrollY
+    } else continue
+    first = Math.min(first, from)
+    last = Math.max(last, to)
+  }
+  // Content placed lower (centered, at the end) gives the room above it back; a margin that
+  // collapses out of the box does not count twice.
+  const content = Number.isFinite(first) ? last - Math.max(first, contentTop) : 0
+  return contentTop + Math.max(0, content) + edgeBottom + margin
+}
+
 function contentHeight(): number {
   const body = document.body
   if (!body) return 0
   const bodyStyle = getComputedStyle(body)
+  stretched = []
+  decide([document.documentElement, body], filling(body, window.innerHeight))
   let bottom = 0
   for (const child of Array.from(body.children)) {
-    if (child instanceof HTMLScriptElement || child instanceof HTMLStyleElement || child instanceof HTMLLinkElement)
-      continue
-    const style = getComputedStyle(child)
-    if (style.display === 'none' || style.position === 'fixed') continue
-    const rect = child.getBoundingClientRect()
-    bottom = Math.max(bottom, rect.bottom + Number.parseFloat(style.marginBottom || '0') + window.scrollY)
+    if (!measured(child)) continue
+    bottom = Math.max(bottom, contentBottom(child, window.innerHeight, 0))
   }
-  const extra = Number.parseFloat(bodyStyle.paddingBottom || '0') + Number.parseFloat(bodyStyle.marginBottom || '0')
+  const extra = px(bodyStyle.paddingBottom) + px(bodyStyle.marginBottom)
   return Math.min(Math.ceil(bottom + extra), 40000)
 }
 
@@ -153,24 +387,35 @@ function reportSize() {
 
 function watchSize() {
   let queued = false
+  const resize = new ResizeObserver(() => queue())
+  // A following box keeps its size while what is in it grows: its children are watched as well.
+  const observed = new Set<Element>()
+  const observe = () => {
+    const want = new Set<Element>([document.documentElement, document.body, ...Array.from(document.body.children)])
+    for (const box of stretched) for (const child of Array.from(box.children)) want.add(child)
+    for (const el of observed)
+      if (!want.has(el)) {
+        resize.unobserve(el)
+        observed.delete(el)
+      }
+    for (const el of want)
+      if (!observed.has(el)) {
+        resize.observe(el)
+        observed.add(el)
+      }
+  }
   const queue = () => {
     if (queued) return
     queued = true
     requestAnimationFrame(() => {
       queued = false
       reportSize()
+      observe()
     })
   }
-  const resize = new ResizeObserver(queue)
-  const observeChildren = () => {
-    resize.disconnect()
-    resize.observe(document.documentElement)
-    resize.observe(document.body)
-    for (const child of Array.from(document.body.children)) resize.observe(child)
-  }
-  observeChildren()
+  observe()
   new MutationObserver(() => {
-    observeChildren()
+    observe()
     queue()
   }).observe(document.body, { childList: true })
   window.addEventListener('load', queue)
@@ -344,6 +589,20 @@ export function boot() {
   if (booted) return
   booted = true
   applyTheme(theme)
+  // Stylesheets that come later (a lazy chunk's, a hot update's) answer by the theme too.
+  let restyle = 0
+  new MutationObserver(() => {
+    cancelAnimationFrame(restyle)
+    themeStylesheets()
+    restyle = requestAnimationFrame(themeStylesheets)
+  }).observe(document.head, { childList: true, subtree: true, characterData: true })
+  document.addEventListener(
+    'load',
+    (event) => {
+      if (event.target instanceof HTMLLinkElement) themeStylesheets()
+    },
+    true,
+  )
   // In the viewer a frame's edges do not rubber-band; `:where` leaves the screen's own CSS in charge.
   if (embedded) {
     const style = document.createElement('style')
