@@ -165,7 +165,7 @@ export function CornerPlate({
         {/* One row: whose content it is, then the controls; short of room the controls go under it. */}
         <div className="flex max-w-full flex-wrap items-center justify-end gap-x-2 gap-y-1 rounded-[8px] border border-rule bg-surface p-1 shadow-pop">
           {note ? (
-            <div className="flex min-h-8 min-w-0 flex-[1_1_auto] items-center gap-1.5 pl-2 text-[12px] leading-snug text-muted">
+            <div className="flex min-h-8 min-w-0 flex-[1_1_auto] items-center gap-1.5 pl-2 text-[12px] leading-snug text-muted last:pr-2">
               <Icon name="info" size={13} className="shrink-0" />
               <span className="min-w-0">{note}</span>
             </div>
