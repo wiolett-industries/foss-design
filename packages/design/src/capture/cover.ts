@@ -1,9 +1,12 @@
 import fs from 'node:fs'
 import os from 'node:os'
+import path from 'node:path'
+import type { ModuleMap } from '../build/static'
 import type { Progress } from '../cli/log'
 import { DesignProject } from '../core/project'
 import { DEV_URLS } from '../core/sources'
-import { SnapshotStore, sourceHash } from '../server/snapshots'
+import { toPosix } from '../core/text'
+import { depsHash, SnapshotStore, sourceHash } from '../server/snapshots'
 import type { CanvasDoc, Theme } from '../shared/types'
 import { serveBuild } from './build-server'
 import { findChrome, launchChrome, openFrame } from './chrome'
@@ -36,6 +39,7 @@ export function staleSnapshots(
   const store = new SnapshotStore(paths.snapshots)
   const project = new DesignProject(paths, DEV_URLS, store.lookup)
   const stale: SnapshotTarget[] = []
+  const hashes = new Map<string, string>()
   for (const id of canvasIds) {
     const canvas = project.canvas(id)
     if (!canvas) continue
@@ -49,7 +53,9 @@ export function staleSnapshots(
       if (filter.screens && !filter.screens.has(job.id)) continue
       const file = files.get(job.id)
       if (!file || !fs.existsSync(file)) continue
-      const hash = sourceHash(file)
+      // What the frame loaded when last taken (all its files), else the screen file alone.
+      const deps = store.deps(id, job.id)
+      const hash = deps ? depsHash(paths.root, deps, hashes) : sourceHash(file)
       const pinned = inDark.get(job.id) === job.theme
       const themes = pinned ? [job.theme] : THEMES
       for (const theme of themes) {
@@ -89,9 +95,12 @@ export async function takeSnapshots(
   let url: string
   let docOf = (id: string): CanvasDoc => project.canvas(id)!.doc
   let stop = async () => {}
+  let modules: ModuleMap | null = null
+  const hashes = new Map<string, string>()
   try {
-    const build = await serveBuild(paths, 'snapshot-build', { canvases, includeSystem: false })
+    const build = await serveBuild(paths, 'snapshot-build', { canvases, includeSystem: false, moduleMap: true })
     url = build.base
+    modules = build.read<ModuleMap>('modules.json')
     docOf = (id) => build.read<CanvasDoc>(`api/canvas/${id}.json`) ?? project.canvas(id)!.doc
     stop = build.close
   } catch {
@@ -112,12 +121,28 @@ export async function takeSnapshots(
           deviceScaleFactor: Math.min(1, SNAPSHOT_WIDTH / job.width),
           colorScheme: theme,
         })
+        const loaded = new Set<string>()
+        page.on('request', (request) => {
+          const at = request.url()
+          if (at.startsWith(url)) loaded.add(decodeURIComponent(new URL(at).pathname.slice(1)))
+        })
         try {
           const report = await openFrame(page, job.url, { waitForReady: job.waitForReady })
           if (report.ready) {
             const png = await page.screenshot({ fullPage: job.fullPage })
             const height = job.fullPage ? await page.evaluate(() => document.documentElement.scrollHeight) : undefined
-            store.save(canvas, screen, theme, png, height, source)
+            // The project's files this frame loaded: the build files it requested, read back to what they bundle.
+            const file = project.source(canvas, screen)?.file
+            const deps = modules
+              ? [
+                  ...new Set([
+                    ...[...loaded].flatMap((rel) => modules![rel] ?? []),
+                    ...(file ? [toPosix(path.relative(paths.root, file))] : []),
+                  ]),
+                ].sort()
+              : []
+            const hash = deps.length ? depsHash(paths.root, deps, hashes) : source
+            store.save(canvas, screen, theme, png, height, hash, deps.length ? deps : undefined)
           } else failed.push(`${canvas}/${screen} (${theme})`)
         } catch {
           failed.push(`${canvas}/${screen} (${theme})`)

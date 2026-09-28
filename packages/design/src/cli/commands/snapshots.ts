@@ -22,6 +22,16 @@ export async function runSnapshots(paths: DesignPaths, targets: string[], option
   }
   if (options.page && picked.size !== 1)
     throw new CliError('--page needs exactly one canvas: `design snapshots <canvas> --page <id>`')
+  const project = new DesignProject(paths, DEV_URLS)
+  for (const [canvas, screens] of picked) {
+    if (!screens) continue
+    const ids = new Set(project.canvas(canvas)!.screens.map((screen) => screen.id))
+    const missing = [...screens].filter((id) => !ids.has(id))
+    if (missing.length)
+      throw new CliError(
+        `No screen ${missing.map((id) => `"${id}"`).join(', ')} in "${canvas}". Screens: ${[...ids].slice(0, 30).join(', ')}${ids.size > 30 ? ', …' : ''}`,
+      )
+  }
   const canvases = picked.size ? [...picked.keys()] : known
   const stale = canvases.flatMap((canvas) =>
     staleSnapshots(paths, [canvas], { page: options.page, screens: picked.get(canvas) ?? undefined }),

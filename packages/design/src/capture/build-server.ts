@@ -21,7 +21,7 @@ export interface ServedBuild {
 export async function serveBuild(
   paths: DesignPaths,
   name: string,
-  options: { canvases?: string[]; includeSystem: boolean },
+  options: { canvases?: string[]; includeSystem: boolean; moduleMap?: boolean },
 ): Promise<ServedBuild> {
   const out = path.join(paths.cache, name)
   fs.rmSync(out, { recursive: true, force: true })
@@ -29,6 +29,7 @@ export async function serveBuild(
     canvases: options.canvases,
     includeSystem: options.includeSystem,
     includeViewer: false,
+    moduleMap: options.moduleMap,
   })
   const files = sirv(out, { dev: true })
   const server = http.createServer((req, res) => {

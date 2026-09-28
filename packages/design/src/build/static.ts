@@ -31,7 +31,16 @@ export interface BuildOptions {
   includeSystem?: boolean
   /** Copy the static viewer (`index.html` and its assets) into the site. Default true. */
   includeViewer?: boolean
+  /**
+   * Write `modules.json`: each built JS file and the project's source files bundled into it
+   * (relative to the project root, packages left out), so a frame's sources can be read back from
+   * what it loaded. Snapshots use it to tell when a screen's code changed.
+   */
+  moduleMap?: boolean
 }
+
+/** `modules.json` of a build made with `moduleMap`. */
+export type ModuleMap = Record<string, string[]>
 
 const THEMES: Theme[] = ['light', 'dark']
 /** What HTML screens keep next to them in the site: data files, images, plain scripts. Sources are bundled instead. */
@@ -190,10 +199,29 @@ export async function buildSite(paths: DesignPaths, out: string, options: BuildO
   }
 
   fs.mkdirSync(out, { recursive: true })
+  const moduleMap: ModuleMap = {}
   if (inputs.length) {
     const base = baseConfig(project)
     await build({
       ...base,
+      plugins: [
+        ...(base.plugins ?? []),
+        options.moduleMap
+          ? {
+              name: 'design-module-map',
+              generateBundle(_: unknown, bundle: Record<string, { type: string; moduleIds?: string[] }>) {
+                for (const [file, chunk] of Object.entries(bundle)) {
+                  if (chunk.type !== 'chunk') continue
+                  moduleMap[file] = (chunk.moduleIds ?? [])
+                    .map((id) => id.split('?')[0]!)
+                    .filter((id) => path.isAbsolute(id) && !id.includes(`${path.sep}node_modules${path.sep}`))
+                    .map((id) => toPosix(path.relative(paths.root, id)))
+                    .filter((rel) => !rel.startsWith('..'))
+                }
+              },
+            }
+          : null,
+      ],
       root: staging,
       base: './',
       logLevel: 'warn',
@@ -213,6 +241,7 @@ export async function buildSite(paths: DesignPaths, out: string, options: BuildO
     fs.rmSync(out, { recursive: true, force: true })
     fs.mkdirSync(out, { recursive: true })
   }
+  if (options.moduleMap) fs.writeFileSync(path.join(out, 'modules.json'), JSON.stringify(moduleMap))
 
   // Files HTML screens reach at run time (fetch, plain scripts) stay next to them.
   for (const { source, dir } of htmlScreens) {

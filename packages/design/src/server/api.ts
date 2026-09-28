@@ -6,7 +6,7 @@ import { isInside, packageVersion } from '../core/paths'
 import type { DesignProject } from '../core/project'
 import type { Theme } from '../shared/types'
 import type { EventHub } from './events'
-import { type SnapshotStore, sourceHash } from './snapshots'
+import { depsHash, type SnapshotStore, sourceHash } from './snapshots'
 
 export function sendJson(res: ServerResponse, status: number, body: unknown) {
   res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
@@ -114,8 +114,11 @@ export async function handleApi(
     try {
       const body = await readBody(req)
       if (body.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a') throw new Error('not a PNG')
+      // The frame's files as a build last listed them, else the screen file alone.
+      const deps = snapshots.deps(canvas, id)
       const file = project.source(canvas, id)?.file
-      const { url: snapshotUrl } = snapshots.save(canvas, id, theme, body, height, file ? sourceHash(file) : null)
+      const source = deps ? depsHash(project.paths.root, deps) : file ? sourceHash(file) : null
+      const { url: snapshotUrl } = snapshots.save(canvas, id, theme, body, height, source)
       project.invalidateCanvas(canvas)
       events.send({ type: 'snapshot', canvas, id, theme, url: snapshotUrl, height })
       sendJson(res, 200, { url: snapshotUrl })
