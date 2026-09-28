@@ -461,6 +461,43 @@
 }
 
 /* The dot grid pans as a layer of its own: moving it costs no repaint. */
+/* ripple() (lib/ripple.ts): two rings spread from an element's edge, in --ripple-color. */
+@keyframes target-ripple {
+  0% {
+    box-shadow:
+      0 0 0 0 color-mix(in srgb, var(--ripple-color, var(--action)) 70%, transparent),
+      0 0 0 0 transparent;
+  }
+  20% {
+    box-shadow:
+      0 0 0 8px color-mix(in srgb, var(--ripple-color, var(--action)) 32%, transparent),
+      0 0 0 0 color-mix(in srgb, var(--ripple-color, var(--action)) 55%, transparent);
+  }
+  45% {
+    box-shadow:
+      0 0 0 16px transparent,
+      0 0 0 8px color-mix(in srgb, var(--ripple-color, var(--action)) 24%, transparent);
+  }
+  60%,
+  100% {
+    box-shadow:
+      0 0 0 20px transparent,
+      0 0 0 16px transparent;
+  }
+}
+
+.target-ripple {
+  animation: target-ripple 2s cubic-bezier(0.16, 1, 0.3, 1) 160ms both;
+  isolation: isolate;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .target-ripple {
+    animation: none;
+    box-shadow: 0 0 0 2px var(--ripple-color, var(--action));
+  }
+}
+
 .canvas-grid {
   position: absolute;
   inset: -96px;

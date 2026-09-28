@@ -3,6 +3,8 @@ import { motion } from 'motion/react'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { cn } from '../lib/cn'
 import { listenToFrame, sendToFrame } from '../lib/frames'
+import { ripple } from '../lib/ripple'
+import { Icon } from '../ui/icon'
 
 /** How long the plate stays after the screen loads, or after a tap shows it. */
 const LINGER_MS = 5500
@@ -43,8 +45,9 @@ export function CornerPlate({
   // Whether the frame reports the pointer; if not, hovering the page stands in for the corner.
   const [reported, setReported] = useState(false)
   const [overPage, setOverPage] = useState(false)
-  // Bumped on each load of the screen: the plate draws the eye with a ring once per screen.
+  // Bumped on each load of the screen: the plate draws the eye with a ripple once per screen.
   const [loads, setLoads] = useState(0)
+  const plate = useRef<HTMLDivElement>(null)
   const linger = useRef<ReturnType<typeof setTimeout>>(undefined)
   const leave = useRef<ReturnType<typeof setTimeout>>(undefined)
 
@@ -117,6 +120,13 @@ export function CornerPlate({
 
   const shown = lingering || inside || focused || (!reported && overPage)
 
+  // Once the plate has come in for a new screen.
+  useEffect(() => {
+    if (!loads) return
+    const timer = setTimeout(() => plate.current && ripple(plate.current), 200)
+    return () => clearTimeout(timer)
+  }, [loads])
+
   return (
     <>
       {badge ? (
@@ -137,12 +147,13 @@ export function CornerPlate({
         </motion.button>
       ) : null}
       <motion.div
+        ref={plate}
         initial={{ opacity: 0, scale: 0.94, y: -4 }}
         animate={shown ? { opacity: 1, scale: 1, y: 0 } : { opacity: 0, scale: 0.97, y: -2 }}
         transition={shown ? { type: 'spring', stiffness: 420, damping: 30 } : { duration: 0.45, ease: 'easeOut' }}
         style={{ transformOrigin: 'top right' }}
         className={cn(
-          'absolute top-3 right-3 flex max-w-[calc(100%-24px)] flex-col items-end',
+          'absolute top-3 right-3 flex max-w-[calc(100%-24px)] flex-col items-end rounded-[8px]',
           !shown && 'pointer-events-none',
         )}
         aria-hidden={!shown || undefined}
@@ -151,19 +162,15 @@ export function CornerPlate({
           if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(false)
         }}
       >
-        <div className="relative flex max-w-full flex-col gap-1 rounded-[8px] border border-rule bg-surface p-1 shadow-pop">
-          {loads > 0 ? (
-            <motion.span
-              key={loads}
-              aria-hidden
-              initial={{ opacity: 0.55, scale: 1 }}
-              animate={{ opacity: 0, scale: 1.18 }}
-              transition={{ duration: 1.1, ease: 'easeOut', delay: 0.15 }}
-              className="pointer-events-none absolute -inset-px rounded-[8px] border-2 border-action"
-            />
+        {/* One row: whose content it is, then the controls; short of room the controls go under it. */}
+        <div className="flex max-w-full flex-wrap items-center justify-end gap-x-2 gap-y-1 rounded-[8px] border border-rule bg-surface p-1 shadow-pop">
+          {note ? (
+            <div className="flex min-h-8 min-w-0 flex-[1_1_auto] items-center gap-1.5 pl-2 text-[12px] leading-snug text-muted">
+              <Icon name="info" size={13} className="shrink-0" />
+              <span className="min-w-0">{note}</span>
+            </div>
           ) : null}
           {children ? <div className="flex items-center gap-1">{children}</div> : null}
-          {note ? <div className="px-2 pb-1 text-[11.5px] leading-snug text-muted">{note}</div> : null}
         </div>
       </motion.div>
     </>
